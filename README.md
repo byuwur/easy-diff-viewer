@@ -1,5 +1,7 @@
 # byuwur/easy-diff-viewer
 
+![easy-diff-viewer preview](prev.jpg)
+
 **Diff, spot what changed.**
 
 Compare two strings in a unified or side-by-side view, with line numbers and exact source copying.
@@ -178,7 +180,7 @@ node --check diff.js
 node --test tests/rendering.cjs
 ```
 
-`BROWSER_CHANNEL=chrome` uses installed Chrome; `CHROMIUM_EXECUTABLE_PATH` selects a Chromium executable. Otherwise, install Playwright Chromium.
+`BROWSER_CHANNEL=chrome` uses installed Chrome; `CHROMIUM_EXECUTABLE_PATH` selects a Chromium executable. Otherwise, install Playwright Chromium. [GitHub Actions](.github/workflows/rendering.yml) runs the same suite.
 
 ## The easy viewers
 
