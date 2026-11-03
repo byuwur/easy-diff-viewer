@@ -1,0 +1,554 @@
+const assert = require("node:assert/strict");
+const path = require("node:path");
+const { pathToFileURL } = require("node:url");
+const test = require("node:test");
+const { chromium } = require("playwright");
+
+// Caller-provided legacy stylesheets reuse the canonical palettes without distribution files.
+const legacyThemeCSS = (theme) => {
+  const css = require("node:fs").readFileSync(path.join(__dirname, "../diff.css"), "utf8");
+  const section = css.split(`/* --- ${theme.toUpperCase()} --- */`)[1];
+  return `.byDIFFdocument {${section.match(/\{([\s\S]*?)\}/)[1]}}`;
+};
+
+test("DIFF standalone browser contracts", async (t) => {
+  const browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || undefined, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined });
+  try {
+    const page = await browser.newPage();
+    const errors = [],
+      requests = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("request", (request) => {
+      if (/^https?:/.test(request.url()) && !request.url().startsWith("http://viewer.test/")) requests.push(request.url());
+    });
+    await page.route("http://viewer.test/**", (route) => {
+      const filename = new URL(route.request().url()).pathname.slice(1);
+      if (/^diff\.(light|dark)\.css$/.test(filename)) return route.fulfill({ body: legacyThemeCSS(filename.includes(".dark.css") ? "dark" : "light"), contentType: "text/css" });
+      if (!filename || filename === "index.html")
+        return route.fulfill({
+          contentType: "text/html",
+          body: '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="diff.css"><script src="diff.js"></script><div id="viewer" data-theme="light"></div>'
+        });
+      return route.fulfill({ path: path.join(__dirname, "..", filename), contentType: filename.endsWith(".css") ? "text/css" : "text/javascript" });
+    });
+    await page.goto("http://viewer.test/index.html");
+    await page.evaluate(
+      async ({ source, second, options }) => {
+        await byDIFFviewer(document.getElementById("viewer"), source, second, options).ready;
+      },
+      {
+        source: "A small document\nKeep this line\nOld wording\nLast line\n",
+        second: "A small document\nAn added line\nKeep this line\nNew wording\nLast line\n",
+        options: { fontSizeControls: true,  view: "unified", lineNumbers: true, ignoreWhitespace: false, batchSize: 500 }
+      }
+    );
+    await page.waitForFunction(() => document.getElementById("viewer")?.getAttribute("aria-busy") !== "true" && typeof window.byDIFFviewer === "function");
+    await page.evaluate(() => {
+      window.root = document.getElementById("viewer");
+      window.copies = [];
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (value) => copies.push(value) } });
+    });
+    await t.test("themes, copy, font size, and responsive controls", async () => {
+      assert.equal(await page.locator("#viewer [role=alert]:visible").count(), 0);
+      await page.locator(".byVIEWcopy").click();
+      assert.equal(await page.evaluate(() => typeof copies.at(-1)), "string");
+      await page.getByRole("button", { name: "Switch to dark theme" }).click();
+      await page.waitForFunction(() => getComputedStyle(root).backgroundColor === "rgb(39, 40, 34)");
+      await page.getByRole("button", { name: "Increase text size" }).click();
+      assert.equal(await page.evaluate(() => root.style.fontSize), "1.125rem");
+      await page.setViewportSize({ width: 320, height: 640 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      await page.setViewportSize({ width: 1100, height: 800 });
+      await page.getByRole("button", { name: "Reset text size" }).click();
+    });
+    await t.test("clipboard denial is reported", async () => {
+      await page.evaluate(() => {
+        navigator.clipboard.writeText = async () => {
+          throw new Error("denied");
+        };
+      });
+      await page.locator(".byVIEWcopy").click();
+      assert.equal(await page.locator(".byVIEWcopy").textContent(), "Failed");
+      await page.evaluate(() => {
+        navigator.clipboard.writeText = async (value) => copies.push(value);
+      });
+    });
+
+    await t.test("Myers edits reconstruct both inputs and match a small LCS oracle", async () => {
+      const result = await page.evaluate(() => {
+        let seed = 7;
+        const random = (n) => {
+          seed = (seed * 1664525 + 1013904223) >>> 0;
+          return seed % n;
+        };
+        const input = () => Array.from({ length: random(9) }, () => String(random(4))).join("\n") + (random(2) ? "\n" : "");
+        for (let sample = 0; sample < 400; sample++) {
+          const before = input(), after = input();
+          const a = before ? before.split("\n") : [], b = after ? after.split("\n") : [];
+          const edits = byDIFFviewer.diff(before, after);
+          if (edits.map((e) => e.oldText ?? "").join("") !== before || edits.map((e) => e.newText ?? "").join("") !== after) return `Reconstruction ${sample}`;
+          const dp = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+          for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+          if (edits.filter((e) => e.type !== "equal").length !== a.length + b.length - 2 * dp[a.length][b.length]) return `Minimality ${sample}`;
+          if (edits.some((e) => e.type === "equal" && e.oldText.replace(/\n$/, "") !== e.newText.replace(/\n$/, ""))) return `False equality ${sample}`;
+          if (edits.filter((e) => e.oldLine !== null).some((e, index) => e.oldLine !== index + 1) || edits.filter((e) => e.newLine !== null).some((e, index) => e.newLine !== index + 1)) return `Line numbers ${sample}`;
+        }
+        return true;
+      });
+      assert.equal(result, true);
+    });
+    await t.test("insertions, deletion, CRLF, final newline, and whitespace modes", async () => {
+      const result = await page.evaluate(() => ({
+        shift: byDIFFviewer.diff("a\nb\nc\n", "x\na\nb\nc\n").map((e) => e.type),
+        empty: byDIFFviewer.diff("", ""),
+        newline: byDIFFviewer.diff("a\n", "a").map((e) => e.type),
+        crlf: byDIFFviewer.diff("a\r\nb\r", "a\nb\n").every((e) => e.type === "equal"),
+        trim: byDIFFviewer.diff(" a b \n", "a b\n", { ignoreWhitespace: "trim" }).length,
+        all: byDIFFviewer.diff(" a b \n", "ab\n", { ignoreWhitespace: "all" }).every((e) => e.type === "equal")
+      }));
+      assert.deepEqual(result, { shift: ["insert", "equal", "equal", "equal", "equal"], empty: [], newline: ["equal", "delete"], crlf: true, trim: 2, all: true });
+    });
+    await t.test("unified/split view, line numbers, and exact copying", async () => {
+      await page.evaluate(async () => {
+        await byDIFFviewer(root, "old\r\n", "new", { viewSelect: true, copyOldButton: true }).ready;
+      });
+      assert.equal(
+        await page
+          .locator("th")
+          .first()
+          .evaluate((cell) => getComputedStyle(cell).whiteSpace),
+        "nowrap"
+      );
+      assert.equal(await page.locator("tbody tr").count(), 3);
+      assert.equal(await page.locator(".byDIFFnoNewline").count(), 1);
+      await page.getByRole("radio", { name: "Side by side", exact: true }).check();
+      assert.equal(await page.locator('table[data-view="split"] tbody tr:first-child td').count(), 4);
+      await page.getByRole("button", { name: "Copy old source", exact: true }).click();
+      assert.equal(await page.evaluate(() => copies.at(-1)), "old\r\n");
+      await page.locator(".byVIEWcopy").click();
+      assert.equal(await page.evaluate(() => copies.at(-1)), "new");
+    });
+    await t.test("safe text, malformed API, empty input, and comparison limits", async () => {
+      const result = await page.evaluate(async () => {
+        let invalid = false;
+        try {
+          byDIFFviewer(root, 42, "");
+        } catch (error) {
+          invalid = error instanceof TypeError;
+        }
+        await byDIFFviewer(root, "", '<img src=x onerror="window.injected=1">', { view: "split", lineNumbers: false }).ready;
+        const safe = !root.querySelector("img") && !window.injected && !root.querySelector(".byDIFFnumber");
+        const empty = await byDIFFviewer(root, "", "").ready;
+        const emptyRows = root.querySelectorAll("tbody tr").length;
+        const limited = await byDIFFviewer(root, Array.from({ length: 510 }, (_, i) => `a${i}\n`).join(""), Array.from({ length: 510 }, (_, i) => `b${i}\n`).join("")).ready;
+        return { invalid, safe, empty, emptyRows, limited, alert: Boolean(root.querySelector("[role=alert]")) };
+      });
+      assert.deepEqual(result, { invalid: true, safe: true, empty: true, emptyRows: 0, limited: false, alert: true });
+    });
+    await t.test("large similar inputs, batching, replacement, and disposal", async () => {
+      const result = await page.evaluate(async () => {
+        const source = Array.from({ length: 12000 }, (_, i) => `Line ${i}\n`).join("");
+        const view = byDIFFviewer(root, source, `inserted\n${source}`);
+        const ready = await view.ready;
+        const rows = root.querySelectorAll("tbody tr").length;
+        const old = byDIFFviewer(root, source, source);
+        const current = byDIFFviewer(root, "a", "b");
+        const cancelled = await old.ready;
+        await current.ready;
+        old.destroy();
+        const preserved = root.childNodes.length > 0;
+        current.destroy();
+        return { ready, rows, cancelled, preserved, disposed: root.childNodes.length === 0 };
+      });
+      assert.deepEqual(result, { ready: true, rows: 500, cancelled: false, preserved: true, disposed: true });
+    });
+
+    await t.test("split replacements align, keep context, and remain paired across batches", async () => {
+      const oldSource = "A small document\nKeep this line\nOld wording\nLast line\n";
+      const newSource = "A small document\nAn added line\nKeep this line\nNew wording\nLast line\n";
+      for (const theme of ["light", "dark"]) {
+        await page.evaluate(async ({ oldSource, newSource, theme }) => {
+          root.dataset.theme = theme;
+          await byDIFFviewer(root, oldSource, newSource, { view: "split", viewSelect: true }).ready;
+        }, { oldSource, newSource, theme });
+        assert.deepEqual(await page.locator("tbody tr").evaluateAll((rows) => rows.map((row) => [...row.cells].map((cell) => cell.querySelector(".byDIFFtext")?.textContent ?? cell.textContent))), [
+          ["1", "A small document", "1", "A small document"],
+          ["", "", "2", "An added line"],
+          ["2", "Keep this line", "3", "Keep this line"],
+          ["3", "Old wording", "4", "New wording"],
+          ["4", "Last line", "5", "Last line"],
+          ["5", "", "6", ""]
+        ]);
+        assert.equal(await page.locator("tbody tr.byDIFFchange .byDIFFdelete").count(), 1);
+        assert.equal(await page.locator("tbody tr.byDIFFchange .byDIFFinsert").count(), 1);
+      }
+      await page.evaluate(async () => {
+        await byDIFFviewer(root, "old one\nold two\n", "new one\nnew two\nnew three\n", { view: "split", batchSize: 1, statusBar: true, viewSelect: true }).ready;
+      });
+      for (const count of [1, 2, 3, 4]) {
+        assert.equal(await page.locator("tbody tr").count(), count);
+        if (count < 4) {
+          if (count < 3) assert.equal(await page.locator("tbody tr").nth(count - 1).locator(".byDIFFcode").allTextContents().then((cells) => cells.every(Boolean)), true);
+          await page.getByRole("button", { name: "Load more differences" }).click();
+        }
+      }
+      assert.deepEqual(await page.locator("tbody tr").nth(2).locator(".byDIFFcode").allTextContents(), ["", "new three"]);
+      assert.deepEqual(await page.locator("tbody tr").last().locator(".byDIFFtext").allTextContents(), ["", ""]);
+      assert.match(await page.locator(".byVIEWpanel > .byVIEWstatus").textContent(), /4 of 4 rows/);
+      assert.equal(await page.getByRole("button", { name: "Load more differences" }).isVisible(), false);
+      await page.getByRole("radio", { name: "Unified", exact: true }).check();
+      assert.equal(await page.locator(".byDIFFtable").getAttribute("data-view"), "unified");
+      await page.getByRole("radio", { name: "Unified", exact: true }).press("ArrowRight");
+      assert.equal(await page.locator(".byDIFFtable").getAttribute("data-view"), "split");
+      await page.evaluate(async () => {
+        const other = document.createElement("div");
+        other.id = "other-layout";
+        document.body.appendChild(other);
+        await byDIFFviewer(other, "a", "b", { viewSelect: true }).ready;
+      });
+      await page.locator("#viewer").getByRole("radio", { name: "Unified", exact: true }).check();
+      assert.equal(await page.locator("#other-layout .byDIFFtable").getAttribute("data-view"), "unified");
+      assert.equal(await page.locator("#other-layout").getByRole("radio", { name: "Unified", exact: true }).isChecked(), true);
+      await page.locator("#other-layout").evaluate((element) => element.remove());
+      await page.evaluate(async () => { await byDIFFviewer(root, "old", "new", { view: "split", lineNumbers: false }).ready; });
+      assert.equal(await page.locator("tbody tr").count(), 1);
+      assert.equal(await page.locator("tbody td").count(), 2);
+      assert.equal(await page.locator(".byDIFFnoNewline").count(), 2);
+    });
+
+    await t.test("trailing newlines change the final blank row instead of unchanged text", async () => {
+      const before = "A small document\nKeep this line\nOld wording\nLast line";
+      const after = "A small document\nAn added line\nKeep this line\nNew wording\nLast line\n";
+      for (const mode of ["light", "dark"]) {
+        for (const view of ["unified", "split"]) {
+          for (const reverse of [false, true]) {
+            for (const lineNumbers of [true, false]) {
+              const oldSource = reverse ? after : before, newSource = reverse ? before : after;
+              const result = await page.evaluate(async ({ mode, view, oldSource, newSource, lineNumbers }) => {
+                root.dataset.theme = mode;
+                await byDIFFviewer(root, oldSource, newSource, { view, lineNumbers, statusBar: true, copyOldButton: true, loadMore: false }).ready;
+                const edits = byDIFFviewer.diff(oldSource, newSource);
+                const last = edits.find((edit) => edit.oldText?.startsWith("Last line") && edit.newText?.startsWith("Last line"));
+                return { last: last?.type, oldText: edits.map((edit) => edit.oldText ?? "").join(""), newText: edits.map((edit) => edit.newText ?? "").join("") };
+              }, { mode, view, oldSource, newSource, lineNumbers });
+              assert.deepEqual(result, { last: "equal", oldText: oldSource, newText: newSource });
+              const context = page.locator('tbody tr').filter({ has: page.locator('.byDIFFtext', { hasText: "Last line" }) });
+              assert.equal(await context.count(), 1);
+              assert.equal(await context.getAttribute("class"), "byDIFFequal");
+              const newline = page.locator('.byDIFFnewline');
+              assert.equal(await newline.count(), 1);
+              assert.equal(await newline.locator('xpath=ancestor::tr').getAttribute('class'), reverse ? "byDIFFdelete" : "byDIFFinsert");
+              assert.equal(await page.locator('tbody .byDIFFnumber').count() > 0, lineNumbers);
+              assert.match(await page.locator('.byVIEWstatus').textContent(), reverse ? /1 additions.*3 deletions/ : /3 additions.*1 deletions/);
+              assert.equal(await page.locator('tbody tr').count(), view === "split" ? 6 : 7);
+              await page.locator('.byVIEWcopy').click();
+              assert.equal(await page.evaluate(() => copies.at(-1)), newSource);
+              await page.getByRole('button', { name:"Copy old source", exact:true }).click();
+              assert.equal(await page.evaluate(() => copies.at(-1)), oldSource);
+            }
+          }
+        }
+      }
+      const cases = await page.evaluate(() => {
+        const result = [];
+        for (const ignoreWhitespace of [false, "trim", "all"]) {
+          for (const [before, after] of [["a", "a\n"], ["a\n", "a"], ["a", "a\r\n"], ["a\r\n", "a"], ["a\n\n", "a\n"]]) {
+            const edits = byDIFFviewer.diff(before, after, { ignoreWhitespace });
+            result.push(edits.filter((edit) => edit.type !== "equal").map((edit) => ({ type:edit.type, oldText:edit.oldText, newText:edit.newText })));
+          }
+        }
+        return result;
+      });
+      for (let index = 0; index < cases.length; index++) {
+        const deletion = index % 5 === 1 || index % 5 === 3 || index % 5 === 4;
+        assert.deepEqual(cases[index], [{ type:deletion ? "delete" : "insert", oldText:deletion ? "" : null, newText:deletion ? null : "" }]);
+      }
+    });
+
+    await t.test("duplicate loading and source independence", async () => {
+      await page.evaluate(() => {
+        window.original = byDIFFviewer;
+      });
+      await page.addScriptTag({ path: path.join(__dirname, "../diff.js") });
+      assert.equal(await page.evaluate(() => original === byDIFFviewer), true);
+      assert.deepEqual(requests, []);
+      assert.deepEqual(errors, []);
+    });
+  } finally {
+    await browser.close();
+  }
+});
+
+test("container themes are scoped, independent, and compatible with legacy links", async () => {
+  const browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || undefined, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined });
+  try {
+    const page = await browser.newPage();
+    const requests = [];
+    page.on("request", (request) => requests.push(request.url()));
+    await page.setContent('<div id="outside" class="dark">Host</div><div id="first" data-theme="dark"></div><div id="second" class="light"></div><div id="third"></div>');
+    await page.addStyleTag({ path: path.join(__dirname, "../diff.css") });
+    await page.addScriptTag({ path: path.join(__dirname, "../diff.js") });
+    await page.evaluate(async (args) => {
+      window.renderTheme = async (element) => {
+        const controller = window.byDIFFviewer(element, ...args);
+        if (controller?.ready) await controller.ready;
+      };
+      for (const id of ["first", "second", "third"]) await renderTheme(document.getElementById(id));
+    }, ["before\n","after\n"]);
+    const color = (id) => page.locator("#" + id).evaluate((element) => getComputedStyle(element).backgroundColor);
+    assert.equal(await color("first"), "rgb(39, 40, 34)");
+    assert.equal(await color("second"), "rgb(250, 250, 245)");
+    assert.equal(await page.locator("#outside").evaluate((element) => getComputedStyle(element).getPropertyValue("--by-view-muted")), "");
+    assert.equal(await page.locator("#first .byVIEWtoolbar").evaluate((element) => getComputedStyle(element).getPropertyValue("--by-view-muted").trim()), "#75715e");
+    await page.locator("#first .byVIEWthemeToggle").click();
+    assert.equal(await page.locator("#first").getAttribute("data-theme"), "light");
+    assert.equal(await color("second"), "rgb(250, 250, 245)");
+    await page.locator("#second .byVIEWthemeToggle").click();
+    assert.equal(await page.locator("#second").getAttribute("class").then((classes) => classes.split(/\s+/).includes("dark")), true);
+    assert.equal(await page.locator("#second").getAttribute("data-theme"), null);
+    assert.equal(await color("second"), "rgb(39, 40, 34)");
+    await page.evaluate(async () => {
+      const second = document.getElementById("second");
+      second.dataset.theme = "light";
+      await renderTheme(second);
+    });
+    assert.equal(await color("second"), "rgb(250, 250, 245)");
+    await page.evaluate(() => {
+      const first = document.getElementById("first");
+      first.style.setProperty("--by-view-bg", "#123456");
+    });
+    assert.equal(await color("first"), "rgb(18, 52, 86)");
+    assert.equal(await color("second"), "rgb(250, 250, 245)");
+    await page.evaluate(() => document.getElementById("first").style.removeProperty("--by-view-bg"));
+    assert.equal(requests.length, 0, "Container theme changes must not fetch stylesheets");
+
+    await page.route("https://legacy.test/**", (route) => route.fulfill({ body: legacyThemeCSS(route.request().url().includes(".dark.css") ? "dark" : "light"), contentType: "text/css" }));
+    await page.evaluate(async () => {
+      const second = document.getElementById("second");
+      second.removeAttribute("data-theme");
+      second.classList.remove("light", "dark");
+      await new Promise((resolve, reject) => {
+        const link = document.createElement("link");
+        link.id = "byVIEWtheme";
+        link.rel = "stylesheet";
+        link.href = "https://legacy.test/diff.light.css?cache=1#theme";
+        link.onload = resolve;
+        link.onerror = reject;
+        document.head.appendChild(link);
+      });
+      await renderTheme(second);
+      await renderTheme(document.getElementById("third"));
+    });
+    await page.locator("#second .byVIEWthemeToggle").click();
+    await page.waitForFunction(() => getComputedStyle(document.getElementById("second")).backgroundColor === "rgb(39, 40, 34)");
+    assert.equal(await color("third"), "rgb(39, 40, 34)");
+    assert.equal(await color("first"), "rgb(250, 250, 245)");
+    assert.equal(await page.locator("#first .byVIEWthemeToggle").getAttribute("aria-label"), "Switch to dark theme");
+    assert.equal(await page.locator("#byVIEWtheme").getAttribute("href"), "https://legacy.test/diff.dark.css?cache=1#theme");
+    await page.evaluate(async () => {
+      document.getElementById("byVIEWtheme").remove();
+      await renderTheme(document.getElementById("second"));
+    });
+    await page.locator("#second .byVIEWthemeToggle").click();
+    assert.equal(await page.locator("#second").getAttribute("data-theme"), "dark");
+    assert.equal(await color("third"), "rgb(250, 250, 245)");
+  } finally {
+    await browser.close();
+  }
+});
+
+test("named palettes retain mode, isolate custom CSS, and meet High Contrast targets", async () => {
+  const browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || undefined, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined });
+  try {
+    const page = await browser.newPage();
+    await page.setContent('<div id="outside">Host</div><div id="viewer"></div><div id="other" data-theme="dark"></div>');
+    await page.addStyleTag({ path: path.join(__dirname, "../diff.css") });
+    await page.addScriptTag({ path: path.join(__dirname, "../diff.js") });
+    await page.evaluate(async (args) => {
+      window.renderPalette = async (id) => {
+        const controller = window.byDIFFviewer(document.getElementById(id), ...args);
+        if (controller?.ready) await controller.ready;
+      };
+      await renderPalette("viewer");
+      await renderPalette("other");
+    }, ["before\nsame\n","after\nsame\n"]);
+    const root = page.locator("#viewer");
+    const background = () => root.evaluate((element) => getComputedStyle(element).backgroundColor);
+    assert.equal(await background(), "rgb(250, 250, 245)", "Default remains Monokai Light");
+    for (const [palette, colors] of Object.entries({
+      monokai: ["rgb(250, 250, 245)", "rgb(39, 40, 34)"],
+      github: ["rgb(255, 255, 255)", "rgb(13, 17, 23)"],
+      solarized: ["rgb(253, 246, 227)", "rgb(0, 43, 54)"],
+      "high-contrast": ["rgb(255, 255, 255)", "rgb(0, 0, 0)"]
+    })) {
+      await root.evaluate((element, palette) => {
+        element.dataset.theme = palette;
+        element.classList.remove("light", "dark");
+      }, palette);
+      assert.equal(await background(), colors[0], palette);
+      await root.locator(".byVIEWthemeToggle").click();
+      assert.equal(await root.getAttribute("data-theme"), palette);
+      assert.equal(await background(), colors[1], palette);
+      await page.evaluate(() => renderPalette("viewer"));
+      assert.equal(await background(), colors[1], "Rendering preserves the palette and mode");
+      await root.locator(".byVIEWthemeToggle").click();
+      assert.equal(await background(), colors[0]);
+    }
+    for (const mode of ["light", "dark"]) {
+      await root.evaluate((element, mode) => {
+        element.classList.toggle("dark", mode === "dark");
+        element.classList.toggle("light", mode === "light");
+      }, mode);
+      await root.locator(".byVIEWcopy").focus();
+      const measurements = await root.evaluate((element) => {
+        const style = getComputedStyle(element);
+        const luminance = (color) => {
+          const channels = color.startsWith("#")
+            ? color.slice(1).match(/../g).map((part) => parseInt(part, 16))
+            : color.match(/[\d.]+/g).slice(0, 3).map(Number);
+          const values = channels.map((channel) => channel / 255).map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+          return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
+        };
+        const contrast = (a, b) => (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
+        const variables = [...style].filter((property) => property.startsWith("--by-")).map((property) => [property, style.getPropertyValue(property).trim()]);
+        const backgrounds = [style.backgroundColor, ...variables.filter(([property]) => /-(?:alt|code-bg|add|remove)$/.test(property)).map(([, value]) => value)];
+        const text = variables.filter(([property, value]) => /^#[0-9a-f]{6}$/i.test(value) && !/-(?:bg|border|alt|add|remove)$/.test(property));
+        const button = getComputedStyle(element.querySelector(".byVIEWcopy"));
+        return {
+          text: text.flatMap(([property, value]) => backgrounds.map((bg) => ({ property, ratio: contrast(value, bg) }))),
+          border: contrast(button.borderTopColor, style.backgroundColor),
+          focus: contrast(button.outlineColor, style.backgroundColor),
+          outline: parseFloat(button.outlineWidth)
+        };
+      });
+      assert.ok(measurements.text.length >= 5);
+      for (const { property, ratio } of measurements.text) assert.ok(ratio >= 7, mode + " " + property + ": " + ratio.toFixed(2));
+      assert.ok(measurements.border >= 3);
+      assert.ok(measurements.focus >= 3 && measurements.outline >= 2);
+    }
+    await root.evaluate((element) => {
+      element.classList.add("light", "dark");
+      element.dataset.theme = "github";
+    });
+    assert.equal(await background(), "rgb(13, 17, 23)", "Dark wins when both classes exist");
+    await root.evaluate((element) => { element.dataset.theme = "light"; });
+    assert.equal(await background(), "rgb(250, 250, 245)", "Legacy mode aliases override classes");
+    await page.addStyleTag({ content: '.byDIFFdocument.light[data-theme="ocean"] { --by-view-bg: #f3f8fc; } .byDIFFdocument.dark[data-theme="ocean"] { --by-view-bg: #102a43; }' });
+    await root.evaluate((element) => { element.dataset.theme = "ocean"; element.classList.remove("light", "dark"); });
+    await page.route("https://legacy.test/**", (route) => route.fulfill({ body: "", contentType: "text/css" }));
+    await page.evaluate(() => new Promise((resolve) => {
+      const link = document.createElement("link");
+      link.id = "byVIEWtheme";
+      link.rel = "stylesheet";
+      link.href = "https://legacy.test/diff.dark.css?cache=1#theme";
+      link.onload = resolve;
+      document.head.appendChild(link);
+    }));
+    await page.evaluate(() => renderPalette("viewer"));
+    assert.equal(await background(), "rgb(250, 250, 245)", "An unclassified custom palette starts in Light");
+    await root.locator(".byVIEWthemeToggle").click();
+    assert.equal(await background(), "rgb(16, 42, 67)");
+    assert.equal(await root.getAttribute("data-theme"), "ocean");
+    assert.equal(await page.locator("#byVIEWtheme").getAttribute("href"), "https://legacy.test/diff.dark.css?cache=1#theme");
+    assert.equal(await page.locator("#other").evaluate((element) => getComputedStyle(element).backgroundColor), "rgb(39, 40, 34)");
+    assert.equal(await page.locator("#outside").evaluate((element) => getComputedStyle(element).getPropertyValue("--by-view-muted")), "");
+
+  } finally {
+    await browser.close();
+  }
+});
+
+test("viewer defaults, optional tools, and copy feedback", async () => {
+  const browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || undefined, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined });
+  try {
+    const page = await browser.newPage({ viewport: { width: 320, height: 720 }, reducedMotion: "reduce" });
+    await page.setContent('<div id="viewer"></div>');
+    await page.addStyleTag({ path: path.join(__dirname, "../diff.css") });
+    await page.addScriptTag({ path: path.join(__dirname, "../diff.js") });
+    await page.evaluate((args) => {
+      window.renderUI = async (options = {}) => {
+        const result = byDIFFviewer(document.getElementById("viewer"), ...args, options);
+        await result?.ready;
+      };
+    }, ["needle\nold\n","needle\nnew\n"]);
+    await page.evaluate(() => renderUI());
+    assert.equal(await page.locator(".byVIEWcontrols button").count(), 5);
+    assert.equal(await page.locator(".byVIEWfontSizes").count(), 1);
+    assert.equal(await page.locator(".byVIEWactions :is(input, select, button):visible").count(), 0);
+    assert.equal(await page.locator(".byVIEWstatus:visible").count(), 1);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.evaluate(() => renderUI({ fontSizeControls: false, statusBar: false }));
+    assert.equal(await page.locator(".byVIEWfontSizes").count(), 0);
+    assert.equal(await page.locator(".byVIEWstatus:visible").count(), 0);
+    await page.evaluate(() => renderUI());
+    for (const scale of [1, 1.5]) {
+      for (const controlsSize of ["small", "regular", "large"]) {
+        for (const font of ["ui-monospace, monospace", "Georgia, serif"]) {
+          for (const mode of ["light", "dark"]) {
+            const errors = await page.evaluate(async ({ scale, controlsSize, font, mode }) => {
+              document.documentElement.style.fontSize = `${scale}rem`;
+              const host = document.getElementById("viewer");
+              host.dataset.theme = mode;
+              host.style.setProperty("--by-view-controls-font", font);
+              await renderUI({ controlsSize });
+              const button = host.querySelector(".byVIEWthemeToggle");
+              const rect = button.getBoundingClientRect();
+              const style = getComputedStyle(button), thumb = getComputedStyle(button, "::after");
+              const innerWidth = rect.width - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth);
+              const innerHeight = rect.height - parseFloat(style.borderTopWidth) - parseFloat(style.borderBottomWidth);
+              const position = (value, extent) => value.endsWith("%") ? parseFloat(value) * extent / 100 : parseFloat(value);
+              const centerX = rect.left + parseFloat(style.borderLeftWidth) + position(thumb.left, innerWidth);
+              const centerY = rect.top + parseFloat(style.borderTopWidth) + position(thumb.top, innerHeight);
+              const icons = [...button.querySelectorAll("svg")];
+              const icon = icons[mode === "dark" ? 1 : 0].getBoundingClientRect();
+              return [Math.abs(centerX - icon.x - icon.width / 2), Math.abs(centerY - icon.y - icon.height / 2), Math.abs(centerY - rect.y - rect.height / 2)];
+            }, { scale, controlsSize, font, mode });
+            assert.ok(errors.every((error) => error < 0.06), `${scale} ${controlsSize} ${font} ${mode}: ${errors}`);
+          }
+        }
+      }
+    }
+    await page.evaluate(async () => {
+      document.documentElement.style.fontSize = "";
+      document.getElementById("viewer").style.removeProperty("--by-view-controls-font");
+      await renderUI();
+    });
+    for (const mode of ["light", "dark"]) {
+      await page.locator("#viewer").evaluate((element, mode) => { element.dataset.theme = mode; }, mode);
+      await page.evaluate(() => renderUI({ toolbar: false, controlsPosition: "bottom", sorting: false, pagination: false, collapsible: false, details: false, lineNumbers: false, loadMore: false }));
+      assert.equal(await page.locator("#viewer :is(button, input, select, summary):visible").count(), 0);
+      assert.equal(await page.locator(".byVIEWtoolbar").count(), 0);
+      assert.equal(await page.locator("#viewer").evaluate((element) => element.classList.contains("byVIEWbottom")), false);
+      assert.match(await page.locator("#viewer").textContent(), /needle/);
+    }
+    await page.evaluate(() => renderUI({ batchSize: 1 }));
+    assert.equal(await page.getByRole("button", { name: "Load more", exact: false }).isVisible(), true);
+    await page.evaluate(() => renderUI({ batchSize: 1, loadMore: false }));
+    assert.equal(await page.locator(".byDIFFtable tbody tr").count(), 4);
+    assert.equal(await page.getByRole("button", { name: "Load more", exact: false }).isVisible(), false);
+    await page.evaluate(() => renderUI({ credits: false }));
+    assert.equal(await page.locator(".byVIEWinfo").count(), 0);
+    assert.equal(await page.locator(".byVIEWcontrols button").count(), 5);
+    await page.evaluate(() => renderUI({ credits: false, themeToggle: false, fontSizeControls: false, copyButton: false }));
+    assert.equal(await page.locator(".byVIEWtoolbar").count(), 0);
+    await page.evaluate((options) => renderUI({ fontSizeControls: true, ...options }), {"viewSelect":true,"copyOldButton":true,"statusBar":true});
+    assert.equal(await page.locator(".byVIEWfontSize").count(), 3);
+    assert.equal(await page.locator(".byVIEWpanel > .byVIEWstatus:visible").count(), 1);
+    assert.ok(await page.locator(".byVIEWpanel > .byVIEWstatus").evaluate((status) => parseFloat(getComputedStyle(status).borderBottomWidth) > 0));
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => { throw new Error("Denied"); } } });
+    });
+    await page.locator(".byVIEWcopy").click();
+    await page.mouse.move(0, 0);
+    await page.locator(".byVIEWcopy").evaluate((element) => element.blur());
+    assert.equal(await page.locator(".byVIEWcopy").getAttribute("data-state"), "error");
+    assert.equal(await page.locator(".byVIEWcopy").textContent(), "Failed");
+    await page.evaluate(() => { navigator.clipboard.writeText = async (value) => { window.copiedSource = value; }; });
+    await page.locator(".byVIEWcopy").click();
+    assert.equal(await page.locator(".byVIEWcopy").getAttribute("data-state"), "success");
+    assert.match(await page.evaluate(() => copiedSource), /needle/);
+  } finally {
+    await browser.close();
+  }
+});

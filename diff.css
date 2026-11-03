@@ -1,0 +1,546 @@
+/* byuwur was here */
+
+/* Monokai is the default. Classes select mode; named data-theme values select a palette.
+   data-theme="light" / "dark" remain mode aliases and override mode classes. */
+
+/* --- LIGHT --- */
+.byDIFFdocument,
+.byDIFFdocument.light:not([data-theme="dark"]),
+.byDIFFdocument[data-theme="light"] {
+  color-scheme: light;
+  --by-view-toggle-position: 25%;
+  --by-view-muted: #8a8875;
+  --by-view-bg: #fafaf5;
+  --by-view-text: #272822;
+  --by-view-border: #d8d8c8;
+  --by-view-secondary: #686856;
+  --by-view-accent: #087f8c;
+  --by-view-alt: #eeeee4;
+  --by-view-string: #647d00;
+  --by-view-literal: #7c42b5;
+  --by-view-error: #c7255e;
+  --by-diff-add: #e4edc9;
+  --by-diff-remove: #f8dce5;
+}
+
+/* --- DARK --- */
+.byDIFFdocument.dark:not([data-theme="light"]),
+.byDIFFdocument[data-theme="dark"] {
+  color-scheme: dark;
+  --by-view-toggle-position: 75%;
+  --by-view-muted: #75715e;
+  --by-view-bg: #272822;
+  --by-view-text: #f8f8f2;
+  --by-view-border: #49483e;
+  --by-view-secondary: #a6a28c;
+  --by-view-accent: #66d9ef;
+  --by-view-alt: #34352f;
+  --by-view-string: #e6db74;
+  --by-view-literal: #ae81ff;
+  --by-view-error: #f92672;
+  --by-diff-add: #34452b;
+  --by-diff-remove: #512c3a;
+}
+
+/* --- GITHUB --- */
+/* Light */
+.byDIFFdocument[data-theme="github"]:not(.dark) {
+  --by-view-muted: #59636e;
+  --by-view-bg: #ffffff;
+  --by-view-text: #1f2328;
+  --by-view-border: #8c959f;
+  --by-view-secondary: #59636e;
+  --by-view-accent: #0969da;
+  --by-view-alt: #f6f8fa;
+  --by-view-string: #0a3069;
+  --by-view-literal: #8250df;
+  --by-view-error: #a40e26;
+  --by-diff-add: #dafbe1;
+  --by-diff-remove: #ffebe9;
+}
+/* Dark */
+.byDIFFdocument.dark[data-theme="github"] {
+  --by-view-muted: #9198a1;
+  --by-view-bg: #0d1117;
+  --by-view-text: #f0f6fc;
+  --by-view-border: #6e7681;
+  --by-view-secondary: #9198a1;
+  --by-view-accent: #58a6ff;
+  --by-view-alt: #161b22;
+  --by-view-string: #a5d6ff;
+  --by-view-literal: #d2a8ff;
+  --by-view-error: #ff7b72;
+  --by-diff-add: #0f2719;
+  --by-diff-remove: #32151a;
+}
+
+/* --- SOLARIZED --- */
+/* Light */
+.byDIFFdocument[data-theme="solarized"]:not(.dark) {
+  --by-view-muted: #657b83;
+  --by-view-bg: #fdf6e3;
+  --by-view-text: #586e75;
+  --by-view-border: #93a1a1;
+  --by-view-secondary: #657b83;
+  --by-view-accent: #268bd2;
+  --by-view-alt: #eee8d5;
+  --by-view-string: #859900;
+  --by-view-literal: #6c71c4;
+  --by-view-error: #dc322f;
+  --by-diff-add: #e5ebd0;
+  --by-diff-remove: #f6ddce;
+}
+/* Dark */
+.byDIFFdocument.dark[data-theme="solarized"] {
+  --by-view-muted: #839496;
+  --by-view-bg: #002b36;
+  --by-view-text: #93a1a1;
+  --by-view-border: #586e75;
+  --by-view-secondary: #839496;
+  --by-view-accent: #268bd2;
+  --by-view-alt: #073642;
+  --by-view-string: #859900;
+  --by-view-literal: #b58900;
+  --by-view-error: #dc322f;
+  --by-diff-add: #123b31;
+  --by-diff-remove: #3b252c;
+}
+
+/* --- HIGH CONTRAST --- */
+/* Light */
+.byDIFFdocument[data-theme="high-contrast"]:not(.dark) {
+  --by-view-muted: #333333;
+  --by-view-bg: #ffffff;
+  --by-view-text: #000000;
+  --by-view-border: #333333;
+  --by-view-secondary: #333333;
+  --by-view-accent: #0038a8;
+  --by-view-alt: #f0f0f0;
+  --by-view-string: #005a30;
+  --by-view-literal: #5c0066;
+  --by-view-error: #9b0000;
+  --by-diff-add: #e8f2d0;
+  --by-diff-remove: #fce8e8;
+}
+/* Dark */
+.byDIFFdocument.dark[data-theme="high-contrast"] {
+  --by-view-muted: #dddddd;
+  --by-view-bg: #000000;
+  --by-view-text: #ffffff;
+  --by-view-border: #ffffff;
+  --by-view-secondary: #dddddd;
+  --by-view-accent: #00ffff;
+  --by-view-alt: #171717;
+  --by-view-string: #ffff00;
+  --by-view-literal: #ffb5ff;
+  --by-view-error: #ffb3b3;
+  --by-diff-add: #102010;
+  --by-diff-remove: #281012;
+}
+
+/* --- VIEWER --- */
+.byDIFFdocument {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 1rem 1.5rem;
+  border: 0.0625rem solid var(--by-view-border);
+  border-radius: var(--by-view-radius, 0.75rem);
+  background: var(--by-view-bg);
+  color: var(--by-view-text);
+  font:
+    1rem/1.4 system-ui,
+    sans-serif;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
+}
+
+/* --- CONTENT --- */
+.byDIFFdocument *,
+.byDIFFdocument *::before,
+.byDIFFdocument *::after {
+  box-sizing: border-box;
+}
+.byDIFFdocument .byVIEWcontent {
+  min-width: 0;
+  flex: 1 0 auto;
+}
+.byDIFFdocument button,
+.byDIFFdocument input,
+.byDIFFdocument select {
+  max-width: 100%;
+  margin: 0;
+  padding: 0.25em 0.5em;
+  border: 0.0625rem solid var(--by-view-border);
+  border-radius: var(--by-view-radius, 0.65em);
+  background: var(--by-view-bg);
+  color: inherit;
+  font: inherit;
+}
+.byDIFFdocument button {
+  cursor: pointer;
+}
+.byDIFFdocument button:hover {
+  background: var(--by-view-alt);
+}
+.byDIFFdocument button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.byDIFFdocument :is(button, input, select, summary):focus-visible {
+  outline: 0.125rem solid var(--by-view-accent);
+  outline-offset: 0.125rem;
+}
+.byDIFFdocument input[type="search"] {
+  min-width: 0;
+  width: 15em;
+}
+.byDIFFdocument input[type="checkbox"] {
+  accent-color: var(--by-view-accent);
+}
+.byDIFFdocument .byVIEWstatus {
+  margin: 0.6em 0;
+  color: var(--by-view-secondary);
+  font:
+    0.85em/1.4 system-ui,
+    sans-serif;
+}
+.byDIFFdocument .byVIEWerror {
+  color: var(--by-view-error, #ba2531);
+  white-space: pre-wrap;
+}
+.byDIFFdocument summary {
+  cursor: pointer;
+}
+.byDIFFdocument [hidden] {
+  display: none !important;
+}
+.byDIFFdocument .byDIFFscroll {
+  max-width: 100%;
+  overflow: auto;
+  margin: 0;
+}
+.byDIFFdocument .byDIFFtable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.byDIFFdocument :is(td, th) {
+  border-bottom: 0.0625rem solid var(--by-view-border);
+  padding: 0.2em 0.5em;
+  vertical-align: top;
+}
+.byDIFFdocument th {
+  background: var(--by-view-alt);
+  font-size: 0.8em;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+.byDIFFdocument .byDIFFcode {
+  font: 0.9em/var(--by-view-line-height, 1.5) var(--by-view-content-font, ui-monospace, monospace);
+  min-width: 10em;
+}
+.byDIFFdocument .byDIFFtext {
+  white-space: pre;
+}
+.byDIFFdocument :is(.byDIFFnumber, .byDIFFmarker) {
+  color: var(--by-view-secondary);
+  width: 1%;
+  text-align: right;
+  user-select: none;
+  font: 0.85em/var(--by-view-line-height, 1.5) var(--by-view-content-font, ui-monospace, monospace);
+}
+.byDIFFdocument .byDIFFtable[data-view="unified"] .byDIFFinsert,
+.byDIFFdocument td.byDIFFinsert {
+  background: var(--by-diff-add);
+}
+.byDIFFdocument .byDIFFtable[data-view="unified"] .byDIFFdelete,
+.byDIFFdocument td.byDIFFdelete {
+  background: var(--by-diff-remove);
+}
+.byDIFFdocument :is(.byDIFFnoNewline, .byDIFFnewline) {
+  display: block;
+  color: var(--by-view-secondary);
+  font:
+    italic 0.8em/1.5 system-ui,
+    sans-serif;
+}
+.byDIFFdocument .byVIEWpanel {
+  min-width: 0;
+  margin: 0.375em 0;
+  overflow: hidden;
+  border: 0.0625rem solid var(--by-view-border);
+  border-radius: var(--by-view-radius, 0.65em);
+}
+.byDIFFdocument .byVIEWpanel > .byVIEWstatus {
+  margin: 0;
+  padding: 0.375em 0.625em;
+  border-bottom: 0.0625rem solid var(--by-view-border);
+  background: var(--by-view-alt);
+}
+.byDIFFdocument .byVIEWpanel > :focus-visible {
+  outline-offset: -0.125rem;
+}
+
+/* --- CONTROLS --- */
+.byDIFFdocument > .byVIEWtoolbar {
+  position: sticky;
+  flex-shrink: 0;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25em;
+  margin: 0;
+  padding: 0.5rem 0;
+  background: var(--by-view-bg);
+  font: 0.875rem/1.25 var(--by-view-controls-font, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace);
+  white-space: normal;
+}
+.byDIFFdocument > .byVIEWtoolbar[data-size="small"] {
+  font-size: 0.7rem;
+}
+.byDIFFdocument > .byVIEWtoolbar[data-size="large"] {
+  font-size: 1rem;
+}
+.byDIFFdocument.byVIEWbottom {
+  padding-top: 1rem;
+  padding-bottom: 0;
+}
+.byDIFFdocument.byVIEWcompact > .byVIEWtoolbar {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.byDIFFdocument.byVIEWbottom > .byVIEWtoolbar {
+  top: auto;
+  bottom: 0;
+  flex-direction: column-reverse;
+}
+.byDIFFdocument.byVIEWcompact.byVIEWbottom > .byVIEWtoolbar {
+  flex-direction: row;
+  flex-wrap: wrap-reverse;
+}
+.byDIFFdocument > .byVIEWtoolbar .byVIEWinfo {
+  max-width: 100%;
+  color: var(--by-view-muted);
+  opacity: 0.25;
+  font-size: 0.75em;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.byDIFFdocument > .byVIEWtoolbar .byVIEWinfo:hover,
+.byDIFFdocument > .byVIEWtoolbar .byVIEWinfo:focus-within,
+.byDIFFdocument[data-theme="high-contrast"] > .byVIEWtoolbar .byVIEWinfo {
+  opacity: 1;
+}
+.byDIFFdocument.byVIEWcompact > .byVIEWtoolbar .byVIEWinfo {
+  flex: 1 1 auto;
+  text-align: left;
+}
+.byDIFFdocument > .byVIEWtoolbar .byVIEWinfo a {
+  color: inherit;
+  text-decoration: none;
+}
+.byDIFFdocument > .byVIEWtoolbar .byVIEWinfo a:hover,
+.byDIFFdocument > .byVIEWtoolbar .byVIEWinfo a:focus-visible {
+  text-decoration: underline;
+}
+.byDIFFdocument > .byVIEWtoolbar .byVIEWcontrols {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.375em;
+  margin-left: auto;
+  max-width: 100%;
+}
+.byDIFFdocument > .byVIEWtoolbar button {
+  flex-shrink: 0;
+  min-width: 2em;
+  height: 2em;
+  margin: 0;
+  padding: 0.25em 0.5em;
+  border: 0.0625rem solid var(--by-view-border);
+  border-radius: var(--by-view-radius, 0.65em);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.byDIFFdocument > .byVIEWtoolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.byDIFFdocument > .byVIEWtoolbar button:focus-visible {
+  outline: 0.125rem solid currentColor;
+  outline-offset: 0.125rem;
+}
+.byDIFFdocument > .byVIEWtoolbar .byVIEWfontSizes {
+  display: flex;
+  padding: 0.0625em;
+  gap: 0.0625em;
+  border: 0.0625rem solid var(--by-view-border);
+  border-radius: var(--by-view-radius, 0.65em);
+}
+.byDIFFdocument > .byVIEWtoolbar .byVIEWfontSize {
+  width: 1.875em;
+  padding: 0.125em;
+  border: 0;
+  border-radius: 0.4em;
+}
+.byDIFFdocument > .byVIEWtoolbar .byVIEWcopy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+}
+.byDIFFdocument > .byVIEWtoolbar .byVIEWcopy svg {
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+}
+.byDIFFdocument > .byVIEWtoolbar .byVIEWthemeToggle {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  place-items: center;
+  width: calc(3.5em - 0.125rem);
+  height: 1.75em;
+  padding: 0;
+  border-radius: 2em;
+  font-family: ui-monospace, monospace;
+  font-variant-emoji: text;
+}
+.byDIFFdocument > .byVIEWtoolbar .byVIEWthemeToggle svg {
+  width: 1.25em;
+  height: 1.25em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.byDIFFdocument > .byVIEWtoolbar .byVIEWthemeToggle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: var(--by-view-toggle-position);
+  width: calc(1.5em - 0.125rem);
+  height: calc(1.5em - 0.125rem);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  border-radius: 50%;
+  background: currentColor;
+  transition: left 0.2s;
+}
+
+.byDIFFdocument .byVIEWactions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375em;
+  max-width: 100%;
+}
+
+.byDIFFdocument .byVIEWactions,
+.byDIFFdocument .byVIEWcontent :is(button, input, select) {
+  font-family: var(--by-view-controls-font, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace);
+}
+
+/* --- INTERACTION --- */
+.byDIFFdocument button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background-color 0.15s, box-shadow 0.15s;
+}
+.byDIFFdocument button:not(:disabled):hover {
+  background: color-mix(in srgb, currentColor 7%, var(--by-view-bg));
+}
+.byDIFFdocument button:not(:disabled):active {
+  background: color-mix(in srgb, currentColor 13%, var(--by-view-bg));
+}
+.byDIFFdocument button:focus-visible {
+  outline: 0.125rem solid var(--by-view-accent);
+  outline-offset: 0.125rem;
+}
+.byDIFFdocument button[data-state="success"] {
+  border-color: var(--by-view-accent);
+  box-shadow: inset 0 0 0 0.0625rem var(--by-view-accent);
+}
+.byDIFFdocument button[data-state="error"] {
+  border-color: currentColor;
+  border-style: dashed;
+}
+.byDIFFdocument .byVIEWactions:empty {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .byDIFFdocument button,
+  .byDIFFdocument .byVIEWthemeToggle::after {
+    transition: none;
+  }
+}
+.byDIFFdocument .byVIEWactions {
+  gap: 0.375em;
+  margin: 0.25em 0 0.5em;
+  font-size: 0.8125rem;
+}
+.byDIFFdocument .byVIEWactions label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+}
+.byDIFFdocument .byVIEWactions input[type="search"] {
+  flex: 1 1 12em;
+  width: auto;
+}
+.byDIFFdocument :is(input, select) {
+  min-height: 2em;
+}
+.byDIFFdocument input[type="checkbox"] {
+  min-height: 0;
+}
+
+.byDIFFdocument .byVIEWsegments {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.0625rem;
+  padding: 0.0625rem;
+  border: 0.0625rem solid var(--by-view-border);
+  border-radius: var(--by-view-radius, 0.65em);
+}
+.byDIFFdocument .byVIEWsegments label {
+  position: relative;
+  min-width: 0;
+  cursor: pointer;
+}
+.byDIFFdocument .byVIEWsegments input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.byDIFFdocument .byVIEWsegments span {
+  width: 100%;
+  padding: 0.25em 0.5em;
+  border-radius: 0.4em;
+  text-align: center;
+}
+.byDIFFdocument .byVIEWsegments input:checked + span {
+  background: var(--by-view-alt);
+  box-shadow: inset 0 0 0 0.0625rem var(--by-view-accent);
+}
+.byDIFFdocument .byVIEWsegments input:focus-visible + span {
+  outline: 0.125rem solid var(--by-view-accent);
+  outline-offset: -0.125rem;
+}
