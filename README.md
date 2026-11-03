@@ -19,8 +19,8 @@ Open `index.html` for the local playground; its page assets require internet acc
 **Recommended: CDN.** No downloads or package manager.
 
 ```html
-<link href="https://cdn.jsdelivr.net/gh/byuwur/easy-diff-viewer@main/diff.css" rel="stylesheet" />
-<script src="https://cdn.jsdelivr.net/gh/byuwur/easy-diff-viewer@main/diff.js" defer></script>
+<link href="https://cdn.jsdelivr.net/gh/byuwur/easy-diff-viewer@latest/diff.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/gh/byuwur/easy-diff-viewer@latest/diff.js" defer></script>
 <div id="viewer" data-theme="light"></div>
 <script>
   document.addEventListener("DOMContentLoaded", () => {
@@ -29,7 +29,7 @@ Open `index.html` for the local playground; its page assets require internet acc
 </script>
 ```
 
-The CDN example tracks `@main` and requires internet access. Use a published tag or commit to pin a version.
+The CDN example uses `@latest` and requires internet access. Use a published tag or commit to pin a version.
 
 **Local files:** For offline use, save `diff.js` and `diff.css` beside your HTML:
 
