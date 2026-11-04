@@ -11,6 +11,7 @@
   if (global.byDIFFviewer?.initialized) return;
   const instances = new WeakMap();
   let nextViewId = 0;
+  /* --- DOM HELPERS --- */
   const node = (tag, className = "", text) => {
     const element = document.createElement(tag);
     element.className = className;
@@ -52,9 +53,132 @@
     control.addEventListener("focusout", reset);
     return control;
   };
+  /** Yield at a chunk boundary so input events and replacement renders can run. */
   const pause = () => new Promise((resolve) => setTimeout(resolve, 0));
   const positive = (value, fallback, maximum) => (Number.isInteger(value) && value > 0 ? Math.min(value, maximum) : fallback);
+  /* --- PARSING --- */
+  const splitLines = (source) => {
+    if (typeof source !== "string") throw new TypeError("Diff inputs must be strings.");
+    if (source.length > 2000000) throw new RangeError("Each diff input is limited to 2 million characters.");
+    const normalized = source.replace(/\r\n?/g, "\n");
+    const lines = normalized.match(/[^\n]*\n|[^\n]+$/g) || [];
+    // Keep the final blank line separate from the preceding line's text.
+    if (normalized.endsWith("\n")) lines.push("");
+    if (lines.length > 20000) throw new RangeError("Each diff input is limited to 20,000 lines.");
+    return lines;
+  };
+  /** Yield comparison checkpoints and return a bounded Myers edit script with original line payloads. */
+  function* compare(oldSource, newSource, options = {}) {
+    const before = splitLines(oldSource),
+      after = splitLines(newSource);
+    // Comparison keys may ignore whitespace; operation payloads keep both original line texts.
+    const key = (line) => {
+      const text = line.endsWith("\n") ? line.slice(0, -1) : line;
+      return options.ignoreWhitespace === "all" ? text.replace(/\s/g, "") : options.ignoreWhitespace === "trim" ? text.trim() : text;
+    };
+    const a = before.map(key),
+      b = after.map(key);
+    const operation = (type, x, y) => ({ type, oldLine: x === null ? null : x + 1, newLine: y === null ? null : y + 1, oldText: x === null ? null : before[x], newText: y === null ? null : after[y] });
+    let prefix = 0,
+      suffix = 0;
+    while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) prefix++;
+    while (suffix < a.length - prefix && suffix < b.length - prefix && a[a.length - 1 - suffix] === b[b.length - 1 - suffix]) suffix++;
+    const n = a.length - prefix - suffix,
+      m = b.length - prefix - suffix;
+    const output = [];
+    for (let i = 0; i < prefix; i++) output.push(operation("equal", i, i));
+    if (!n || !m) {
+      for (let i = 0; i < n; i++) output.push(operation("delete", prefix + i, null));
+      for (let i = 0; i < m; i++) output.push(operation("insert", null, prefix + i));
+    } else {
+      // Myers tracks the furthest match on each diagonal; saved frontiers reconstruct the edit path.
+      const trace = [],
+        frontier = new Map([[1, 0]]);
+      let work = 0,
+        distance = -1;
+      search: for (let d = 0; d <= Math.min(n + m, 1000); d++) {
+        trace.push(new Map(frontier));
+        for (let k = -d; k <= d; k += 2) {
+          let x = k === -d || (k !== d && (frontier.get(k - 1) ?? -1) < (frontier.get(k + 1) ?? -1)) ? (frontier.get(k + 1) ?? 0) : (frontier.get(k - 1) ?? 0) + 1;
+          let y = x - k;
+          while (x < n && y < m && a[prefix + x] === b[prefix + y]) {
+            x++;
+            y++;
+            work++;
+          }
+          frontier.set(k, x);
+          work++;
+          if (work > 4000000) throw new RangeError("Diff exceeded its comparison budget; compare smaller sections.");
+          if (x >= n && y >= m) {
+            distance = d;
+            break search;
+          }
+        }
+        if (d % 20 === 0) yield;
+      }
+      if (distance < 0) throw new RangeError("Diff exceeds 1,000 edits in the changed region; compare smaller sections.");
+      let x = n,
+        y = m;
+      const edits = [];
+      for (let d = distance; d >= 0; d--) {
+        const previous = trace[d],
+          k = x - y;
+        const previousK = k === -d || (k !== d && (previous.get(k - 1) ?? -1) < (previous.get(k + 1) ?? -1)) ? k + 1 : k - 1;
+        const previousX = previous.get(previousK) ?? 0,
+          previousY = previousX - previousK;
+        while (x > previousX && y > previousY) {
+          edits.push(operation("equal", prefix + x - 1, prefix + y - 1));
+          x--;
+          y--;
+        }
+        if (d === 0) break;
+        if (x === previousX) {
+          edits.push(operation("insert", null, prefix + y - 1));
+          y--;
+        } else {
+          edits.push(operation("delete", prefix + x - 1, null));
+          x--;
+        }
+      }
+      output.push(...edits.reverse());
+    }
+    for (let i = suffix; i > 0; i--) output.push(operation("equal", a.length - i, b.length - i));
+    return output;
+  }
+
+  /* --- RENDERING --- */
+  // Align replacements within each change block without changing the public edit list.
+  const pairChanges = (edits) => {
+    const rows = [];
+    for (let index = 0; index < edits.length; ) {
+      if (edits[index].type === "equal") {
+        rows.push(edits[index++]);
+        continue;
+      }
+      const removed = [],
+        added = [];
+      while (index < edits.length && edits[index].type !== "equal") {
+        const edit = edits[index++];
+        (edit.type === "delete" ? removed : added).push(edit);
+      }
+      for (let offset = 0; offset < Math.max(removed.length, added.length); offset++) {
+        const old = removed[offset],
+          next = added[offset];
+        rows.push({
+          type: old && next ? "change" : old ? "delete" : "insert",
+          oldText: old?.oldText ?? null,
+          oldLine: old?.oldLine ?? null,
+          newText: next?.newText ?? null,
+          newLine: next?.newLine ?? null
+        });
+      }
+    }
+    return rows;
+  };
+
+
   /* --- CONTROLS --- */
+  // Mirrored across the family so each viewer can run without a shared runtime.
   /**
    * Adds container light/dark controls, retaining legacy stylesheet links as a fallback.
    * @param {HTMLElement} element Viewer container and theme owner.
@@ -65,9 +189,7 @@
   const appendThemeToggle = (element, controls, filename) => {
     const escapedFilename = filename.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const themePattern = new RegExp(`^([^?#]*/)?${escapedFilename}\\.(light|dark)\\.css([?#].*)?$`, "i");
-    const stylesheet = [document.getElementById("byVIEWtheme"), ...document.querySelectorAll('link[rel~="stylesheet"]')].find(
-      (link) => link && themePattern.test(link.getAttribute("href") || "")
-    );
+    const stylesheet = [document.getElementById("byVIEWtheme"), ...document.querySelectorAll('link[rel~="stylesheet"]')].find((link) => link && themePattern.test(link.getAttribute("href") || ""));
     // Explicit container state takes precedence over a shared legacy stylesheet.
     const localTheme = (target) => {
       if (["light", "dark"].includes(target.dataset.theme)) return target.dataset.theme;
@@ -80,11 +202,11 @@
     const button = document.createElement("button");
     button.type = "button";
     button.className = "byVIEWthemeToggle";
-    button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12.8A9 9 0 0 1 11.2 3 9 9 0 1 0 21 12.8Z"/></svg><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4m0-14.2-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>';
+    button.innerHTML =
+      '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12.8A9 9 0 0 1 11.2 3 9 9 0 1 0 21 12.8Z"/></svg><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4m0-14.2-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>';
     const sync = () => {
       const next = getTheme() === "dark" ? "light" : "dark";
-      const toggles =
-        !localTheme(element) && legacyTheme() ? [button, ...document.querySelectorAll(".byDIFFdocument > .byVIEWtoolbar > .byVIEWcontrols > .byVIEWthemeToggle")] : [button];
+      const toggles = !localTheme(element) && legacyTheme() ? [button, ...document.querySelectorAll(".byDIFFdocument > .byVIEWtoolbar > .byVIEWcontrols > .byVIEWthemeToggle")] : [button];
       for (const toggle of toggles) {
         // A legacy link must not change the controls of independently themed viewers.
         if (toggle !== button && localTheme(toggle.closest(".byDIFFdocument"))) continue;
@@ -217,6 +339,7 @@
 
   /* --- LIFECYCLE --- */
   // One instance owns the container; replacement disposes its pending work first.
+  /** Replace the previous owner and return its cancellable state. Only the current owner may clear the host. */
   const mount = (element, options, getText) => {
     if (!(element instanceof HTMLElement)) throw new TypeError("byDIFFviewer: element must be an HTMLElement.");
     instances.get(element)?.destroy();
@@ -274,120 +397,6 @@
     return state;
   };
 
-  /* --- CONTENT --- */
-  const splitLines = (source) => {
-    if (typeof source !== "string") throw new TypeError("Diff inputs must be strings.");
-    if (source.length > 2000000) throw new RangeError("Each diff input is limited to 2 million characters.");
-    const normalized = source.replace(/\r\n?/g, "\n");
-    const lines = normalized.match(/[^\n]*\n|[^\n]+$/g) || [];
-    // Keep the final blank line separate from the preceding line's text.
-    if (normalized.endsWith("\n")) lines.push("");
-    if (lines.length > 20000) throw new RangeError("Each diff input is limited to 20,000 lines.");
-    return lines;
-  };
-  function* compare(oldSource, newSource, options = {}) {
-    const before = splitLines(oldSource),
-      after = splitLines(newSource);
-    const key = (line) => {
-      const text = line.endsWith("\n") ? line.slice(0, -1) : line;
-      return options.ignoreWhitespace === "all" ? text.replace(/\s/g, "") : options.ignoreWhitespace === "trim" ? text.trim() : text;
-    };
-    const a = before.map(key),
-      b = after.map(key);
-    const operation = (type, x, y) => ({ type, oldLine: x === null ? null : x + 1, newLine: y === null ? null : y + 1, oldText: x === null ? null : before[x], newText: y === null ? null : after[y] });
-    let prefix = 0,
-      suffix = 0;
-    while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) prefix++;
-    while (suffix < a.length - prefix && suffix < b.length - prefix && a[a.length - 1 - suffix] === b[b.length - 1 - suffix]) suffix++;
-    const n = a.length - prefix - suffix,
-      m = b.length - prefix - suffix;
-    const output = [];
-    for (let i = 0; i < prefix; i++) output.push(operation("equal", i, i));
-    if (!n || !m) {
-      for (let i = 0; i < n; i++) output.push(operation("delete", prefix + i, null));
-      for (let i = 0; i < m; i++) output.push(operation("insert", null, prefix + i));
-    } else {
-      const trace = [],
-        frontier = new Map([[1, 0]]);
-      let work = 0,
-        distance = -1;
-      search: for (let d = 0; d <= Math.min(n + m, 1000); d++) {
-        trace.push(new Map(frontier));
-        for (let k = -d; k <= d; k += 2) {
-          let x = k === -d || (k !== d && (frontier.get(k - 1) ?? -1) < (frontier.get(k + 1) ?? -1)) ? (frontier.get(k + 1) ?? 0) : (frontier.get(k - 1) ?? 0) + 1;
-          let y = x - k;
-          while (x < n && y < m && a[prefix + x] === b[prefix + y]) {
-            x++;
-            y++;
-            work++;
-          }
-          frontier.set(k, x);
-          work++;
-          if (work > 4000000) throw new RangeError("Diff exceeded its comparison budget; compare smaller sections.");
-          if (x >= n && y >= m) {
-            distance = d;
-            break search;
-          }
-        }
-        if (d % 20 === 0) yield;
-      }
-      if (distance < 0) throw new RangeError("Diff exceeds 1,000 edits in the changed region; compare smaller sections.");
-      let x = n,
-        y = m;
-      const edits = [];
-      for (let d = distance; d >= 0; d--) {
-        const previous = trace[d],
-          k = x - y;
-        const previousK = k === -d || (k !== d && (previous.get(k - 1) ?? -1) < (previous.get(k + 1) ?? -1)) ? k + 1 : k - 1;
-        const previousX = previous.get(previousK) ?? 0,
-          previousY = previousX - previousK;
-        while (x > previousX && y > previousY) {
-          edits.push(operation("equal", prefix + x - 1, prefix + y - 1));
-          x--;
-          y--;
-        }
-        if (d === 0) break;
-        if (x === previousX) {
-          edits.push(operation("insert", null, prefix + y - 1));
-          y--;
-        } else {
-          edits.push(operation("delete", prefix + x - 1, null));
-          x--;
-        }
-      }
-      output.push(...edits.reverse());
-    }
-    for (let i = suffix; i > 0; i--) output.push(operation("equal", a.length - i, b.length - i));
-    return output;
-  }
-
-  // Align replacements within each change block without changing the public edit list.
-  const pairChanges = (edits) => {
-    const rows = [];
-    for (let index = 0; index < edits.length;) {
-      if (edits[index].type === "equal") {
-        rows.push(edits[index++]);
-        continue;
-      }
-      const removed = [], added = [];
-      while (index < edits.length && edits[index].type !== "equal") {
-        const edit = edits[index++];
-        (edit.type === "delete" ? removed : added).push(edit);
-      }
-      for (let offset = 0; offset < Math.max(removed.length, added.length); offset++) {
-        const old = removed[offset], next = added[offset];
-        rows.push({
-          type: old && next ? "change" : old ? "delete" : "insert",
-          oldText: old?.oldText ?? null,
-          oldLine: old?.oldLine ?? null,
-          newText: next?.newText ?? null,
-          newLine: next?.newLine ?? null
-        });
-      }
-    }
-    return rows;
-  };
-
   /* --- PUBLIC API --- */
   /** Compare two strings without executing either. ready resolves after the first display batch. */
   function byDIFFviewer(element, oldSource, newSource, options = {}) {
@@ -402,7 +411,10 @@
     viewControl.setAttribute("role", "group");
     viewControl.setAttribute("aria-label", "Diff view");
     const viewName = `byDIFFview-${++nextViewId}`;
-    for (const [value, label] of [["unified", "Unified"], ["split", "Side by side"]]) {
+    for (const [value, label] of [
+      ["unified", "Unified"],
+      ["split", "Side by side"]
+    ]) {
       const choice = node("label");
       const input = node("input");
       input.type = "radio";
@@ -454,6 +466,7 @@
       appendLineText(cell, text, kind);
       row.appendChild(cell);
     };
+    /* --- RENDERING --- */
     const render = () => {
       if (!state.active) return;
       const head = node("thead"),
