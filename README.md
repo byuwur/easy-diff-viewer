@@ -120,6 +120,8 @@ The outer document and inner surfaces have independent CSS backgrounds. Both fol
 }
 ```
 
+The playground uses SPA.js's Pickr assets for color and opacity, with text inputs when Pickr is unavailable. **Copy CSS** exports the appearance overrides; clear a field to restore its theme default. The renderer needs no color-picker dependency.
+
 `diff.css` includes all palettes in Light and Dark. Monokai is the default.
 
 | Palette           | `data-theme`    | What it looks like                                                |
