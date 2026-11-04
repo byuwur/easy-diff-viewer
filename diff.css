@@ -460,7 +460,9 @@
 .byDIFFdocument button {
   -webkit-tap-highlight-color: #0000;
   touch-action: manipulation;
-  transition: background-color 0.15s, box-shadow 0.15s;
+  transition:
+    background-color 0.15s,
+    box-shadow 0.15s;
 }
 .byDIFFdocument button:not(:disabled):hover {
   background: color-mix(in srgb, currentColor 7%, var(--by-view-container-bg, var(--by-view-bg)));

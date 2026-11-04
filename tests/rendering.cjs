@@ -48,7 +48,7 @@ test("DIFF standalone browser contracts", async (t) => {
       {
         source: "A small document\nKeep this line\nOld wording\nLast line\n",
         second: "A small document\nAn added line\nKeep this line\nNew wording\nLast line\n",
-        options: { fontSizeControls: true,  view: "unified", lineNumbers: true, ignoreWhitespace: false, batchSize: 500 }
+        options: { fontSizeControls: true, view: "unified", lineNumbers: true, ignoreWhitespace: false, batchSize: 500 }
       }
     );
     await page.waitForFunction(() => document.getElementById("viewer")?.getAttribute("aria-busy") !== "true" && typeof window.byDIFFviewer === "function");
@@ -92,8 +92,10 @@ test("DIFF standalone browser contracts", async (t) => {
         };
         const input = () => Array.from({ length: random(9) }, () => String(random(4))).join("\n") + (random(2) ? "\n" : "");
         for (let sample = 0; sample < 400; sample++) {
-          const before = input(), after = input();
-          const a = before ? before.split("\n") : [], b = after ? after.split("\n") : [];
+          const before = input(),
+            after = input();
+          const a = before ? before.split("\n") : [],
+            b = after ? after.split("\n") : [];
           const edits = byDIFFviewer.diff(before, after);
           if (edits.map((e) => e.oldText ?? "").join("") !== before || edits.map((e) => e.newText ?? "").join("") !== after) return `Reconstruction ${sample}`;
           const dp = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
@@ -176,10 +178,13 @@ test("DIFF standalone browser contracts", async (t) => {
       const oldSource = "A small document\nKeep this line\nOld wording\nLast line\n";
       const newSource = "A small document\nAn added line\nKeep this line\nNew wording\nLast line\n";
       for (const theme of ["light", "dark"]) {
-        await page.evaluate(async ({ oldSource, newSource, theme }) => {
-          root.dataset.theme = theme;
-          await byDIFFviewer(root, oldSource, newSource, { view: "split", viewSelect: true }).ready;
-        }, { oldSource, newSource, theme });
+        await page.evaluate(
+          async ({ oldSource, newSource, theme }) => {
+            root.dataset.theme = theme;
+            await byDIFFviewer(root, oldSource, newSource, { view: "split", viewSelect: true }).ready;
+          },
+          { oldSource, newSource, theme }
+        );
         assert.deepEqual(await page.locator("tbody tr").evaluateAll((rows) => rows.map((row) => [...row.cells].map((cell) => cell.querySelector(".byDIFFtext")?.textContent ?? cell.textContent))), [
           ["1", "A small document", "1", "A small document"],
           ["", "", "2", "An added line"],
@@ -197,7 +202,16 @@ test("DIFF standalone browser contracts", async (t) => {
       for (const count of [1, 2, 3, 4]) {
         assert.equal(await page.locator("tbody tr").count(), count);
         if (count < 4) {
-          if (count < 3) assert.equal(await page.locator("tbody tr").nth(count - 1).locator(".byDIFFcode").allTextContents().then((cells) => cells.every(Boolean)), true);
+          if (count < 3)
+            assert.equal(
+              await page
+                .locator("tbody tr")
+                .nth(count - 1)
+                .locator(".byDIFFcode")
+                .allTextContents()
+                .then((cells) => cells.every(Boolean)),
+              true
+            );
           await page.getByRole("button", { name: "Load more differences" }).click();
         }
       }
@@ -219,7 +233,9 @@ test("DIFF standalone browser contracts", async (t) => {
       assert.equal(await page.locator("#other-layout .byDIFFtable").getAttribute("data-view"), "unified");
       assert.equal(await page.locator("#other-layout").getByRole("radio", { name: "Unified", exact: true }).isChecked(), true);
       await page.locator("#other-layout").evaluate((element) => element.remove());
-      await page.evaluate(async () => { await byDIFFviewer(root, "old", "new", { view: "split", lineNumbers: false }).ready; });
+      await page.evaluate(async () => {
+        await byDIFFviewer(root, "old", "new", { view: "split", lineNumbers: false }).ready;
+      });
       assert.equal(await page.locator("tbody tr").count(), 1);
       assert.equal(await page.locator("tbody td").count(), 2);
       assert.equal(await page.locator(".byDIFFnoNewline").count(), 2);
@@ -232,27 +248,31 @@ test("DIFF standalone browser contracts", async (t) => {
         for (const view of ["unified", "split"]) {
           for (const reverse of [false, true]) {
             for (const lineNumbers of [true, false]) {
-              const oldSource = reverse ? after : before, newSource = reverse ? before : after;
-              const result = await page.evaluate(async ({ mode, view, oldSource, newSource, lineNumbers }) => {
-                root.dataset.theme = mode;
-                await byDIFFviewer(root, oldSource, newSource, { view, lineNumbers, statusBar: true, copyOldButton: true, loadMore: false }).ready;
-                const edits = byDIFFviewer.diff(oldSource, newSource);
-                const last = edits.find((edit) => edit.oldText?.startsWith("Last line") && edit.newText?.startsWith("Last line"));
-                return { last: last?.type, oldText: edits.map((edit) => edit.oldText ?? "").join(""), newText: edits.map((edit) => edit.newText ?? "").join("") };
-              }, { mode, view, oldSource, newSource, lineNumbers });
+              const oldSource = reverse ? after : before,
+                newSource = reverse ? before : after;
+              const result = await page.evaluate(
+                async ({ mode, view, oldSource, newSource, lineNumbers }) => {
+                  root.dataset.theme = mode;
+                  await byDIFFviewer(root, oldSource, newSource, { view, lineNumbers, statusBar: true, copyOldButton: true, loadMore: false }).ready;
+                  const edits = byDIFFviewer.diff(oldSource, newSource);
+                  const last = edits.find((edit) => edit.oldText?.startsWith("Last line") && edit.newText?.startsWith("Last line"));
+                  return { last: last?.type, oldText: edits.map((edit) => edit.oldText ?? "").join(""), newText: edits.map((edit) => edit.newText ?? "").join("") };
+                },
+                { mode, view, oldSource, newSource, lineNumbers }
+              );
               assert.deepEqual(result, { last: "equal", oldText: oldSource, newText: newSource });
-              const context = page.locator('tbody tr').filter({ has: page.locator('.byDIFFtext', { hasText: "Last line" }) });
+              const context = page.locator("tbody tr").filter({ has: page.locator(".byDIFFtext", { hasText: "Last line" }) });
               assert.equal(await context.count(), 1);
               assert.equal(await context.getAttribute("class"), "byDIFFequal");
-              const newline = page.locator('.byDIFFnewline');
+              const newline = page.locator(".byDIFFnewline");
               assert.equal(await newline.count(), 1);
-              assert.equal(await newline.locator('xpath=ancestor::tr').getAttribute('class'), reverse ? "byDIFFdelete" : "byDIFFinsert");
-              assert.equal(await page.locator('tbody .byDIFFnumber').count() > 0, lineNumbers);
-              assert.match(await page.locator('.byVIEWstatus').textContent(), reverse ? /1 additions.*3 deletions/ : /3 additions.*1 deletions/);
-              assert.equal(await page.locator('tbody tr').count(), view === "split" ? 6 : 7);
-              await page.locator('.byVIEWcopy').click();
+              assert.equal(await newline.locator("xpath=ancestor::tr").getAttribute("class"), reverse ? "byDIFFdelete" : "byDIFFinsert");
+              assert.equal((await page.locator("tbody .byDIFFnumber").count()) > 0, lineNumbers);
+              assert.match(await page.locator(".byVIEWstatus").textContent(), reverse ? /1 additions.*3 deletions/ : /3 additions.*1 deletions/);
+              assert.equal(await page.locator("tbody tr").count(), view === "split" ? 6 : 7);
+              await page.locator(".byVIEWcopy").click();
               assert.equal(await page.evaluate(() => copies.at(-1)), newSource);
-              await page.getByRole('button', { name:"Copy old source", exact:true }).click();
+              await page.getByRole("button", { name: "Copy old source", exact: true }).click();
               assert.equal(await page.evaluate(() => copies.at(-1)), oldSource);
             }
           }
@@ -261,16 +281,22 @@ test("DIFF standalone browser contracts", async (t) => {
       const cases = await page.evaluate(() => {
         const result = [];
         for (const ignoreWhitespace of [false, "trim", "all"]) {
-          for (const [before, after] of [["a", "a\n"], ["a\n", "a"], ["a", "a\r\n"], ["a\r\n", "a"], ["a\n\n", "a\n"]]) {
+          for (const [before, after] of [
+            ["a", "a\n"],
+            ["a\n", "a"],
+            ["a", "a\r\n"],
+            ["a\r\n", "a"],
+            ["a\n\n", "a\n"]
+          ]) {
             const edits = byDIFFviewer.diff(before, after, { ignoreWhitespace });
-            result.push(edits.filter((edit) => edit.type !== "equal").map((edit) => ({ type:edit.type, oldText:edit.oldText, newText:edit.newText })));
+            result.push(edits.filter((edit) => edit.type !== "equal").map((edit) => ({ type: edit.type, oldText: edit.oldText, newText: edit.newText })));
           }
         }
         return result;
       });
       for (let index = 0; index < cases.length; index++) {
         const deletion = index % 5 === 1 || index % 5 === 3 || index % 5 === 4;
-        assert.deepEqual(cases[index], [{ type:deletion ? "delete" : "insert", oldText:deletion ? "" : null, newText:deletion ? null : "" }]);
+        assert.deepEqual(cases[index], [{ type: deletion ? "delete" : "insert", oldText: deletion ? "" : null, newText: deletion ? null : "" }]);
       }
     });
 
@@ -325,7 +351,10 @@ test("suite playground, exports, and stylesheet controls", async () => {
     assert.equal(JSON.parse(await page.locator("#options-json").inputValue()).ignoreWhitespace, "trim");
     await page.locator("#reset-settings").evaluate((button) => button.click());
     await preview.waitForFunction(() => document.querySelector(".byDIFFtable").dataset.view === "unified");
-    const release = await page.frameLocator("#preview-frame").locator(".byVIEWtoolbar").evaluate(() => byDIFFviewer.VERSION);
+    const release = await page
+      .frameLocator("#preview-frame")
+      .locator(".byVIEWtoolbar")
+      .evaluate(() => byDIFFviewer.VERSION);
     assert.ok((await page.frameLocator("#preview-frame").locator(".byVIEWinfo").textContent()).includes(` v${release} `), "Credits must match the runtime release");
     const cdnBase = "https://cdn.jsdelivr.net/gh/byuwur/easy-diff-viewer@latest/";
     const readme = require("node:fs").readFileSync(path.join(__dirname, "../README.md"), "utf8");
@@ -337,13 +366,17 @@ test("suite playground, exports, and stylesheet controls", async () => {
     const starter = await page.locator("#integration-code").inputValue();
     await page.evaluate(() => {
       window.successfulClipboardWrite = navigator.clipboard.writeText;
-      navigator.clipboard.writeText = async () => { throw new Error("Denied"); };
+      navigator.clipboard.writeText = async () => {
+        throw new Error("Denied");
+      };
     });
     await page.locator("#copy-html").click();
     await page.waitForFunction(() => document.querySelector("#copy-html span").textContent === "Failed");
     assert.equal(await page.locator("#integration-code").evaluate((element) => document.activeElement === element && element.selectionEnd === element.value.length), true);
     assert.match(await page.locator("#copy-html").getAttribute("title"), /Ctrl\+C/);
-    await page.evaluate(() => { navigator.clipboard.writeText = window.successfulClipboardWrite; });
+    await page.evaluate(() => {
+      navigator.clipboard.writeText = window.successfulClipboardWrite;
+    });
 
     assert.ok(starter.includes('href="diff.css"'));
     assert.ok(starter.includes('data-theme="light"'));
@@ -488,54 +521,102 @@ test("family customization, navigation and monospace controls", async () => {
     assert.equal(await page.locator("#controlsCompact").isChecked(), true);
     assert.equal(JSON.parse(await page.locator("#options-json").inputValue()).controlsCompact, true);
     assert.equal(await frame.locator(".byDIFFdocument").evaluate((root) => root.classList.contains("byVIEWcompact")), true);
-    assert.deepEqual(await frame.evaluate(async (source) => {
-      const host = document.createElement("div");
-      document.body.append(host);
-      const states = [];
-      let controller;
-      try {
-        for (const options of [undefined, { controlsCompact: false }, { controlsCompact: true }, undefined]) {
-          controller = byDIFFviewer(host, source, "new", options);
+    assert.deepEqual(
+      await frame.evaluate(async (source) => {
+        const host = document.createElement("div");
+        document.body.append(host);
+        const states = [];
+        let controller;
+        try {
+          for (const options of [undefined, { controlsCompact: false }, { controlsCompact: true }, undefined]) {
+            controller = byDIFFviewer(host, source, "new", options);
+            await controller?.ready;
+            states.push(host.classList.contains("byVIEWcompact"));
+          }
+          controller = byDIFFviewer(host, source, "new", { themeToggle: false, fontSizeControls: false, copyButton: false });
           await controller?.ready;
-          states.push(host.classList.contains("byVIEWcompact"));
+          states.push(host.querySelectorAll(".byVIEWinfo").length === 1 && !host.querySelector(".byVIEWcontrols"));
+          return states;
+        } finally {
+          controller?.destroy?.();
+          host.remove();
         }
-        controller = byDIFFviewer(host, source, "new", { themeToggle: false, fontSizeControls: false, copyButton: false });
-        await controller?.ready;
-        states.push(host.querySelectorAll(".byVIEWinfo").length === 1 && !host.querySelector(".byVIEWcontrols"));
-        return states;
-      } finally {
-        controller?.destroy?.();
-        host.remove();
-      }
-    }, "old"), [true, false, true, true, true], "Compact defaults, opt-out, rerenders, and disabled controls agree");
-    assert.deepEqual(await page.locator(".form-switch .form-check-input").first().evaluate((element) => {
-      const style = getComputedStyle(element);
-      return { width: style.width, height: style.height };
-    }), { width: "44px", height: "24px" });
-    assert.equal(await page.locator(".form-switch .form-check-input").evaluateAll((inputs) => inputs.every((input) => {
-      const toggle = input.getBoundingClientRect();
-      const row = input.closest(".form-switch").getBoundingClientRect();
-      return Math.abs(toggle.right - row.right) < 1 && Math.abs(toggle.top + toggle.height / 2 - row.top - row.height / 2) < 1;
-    })), true, "Every switch lines up at the right edge and center of its row");
+      }, "old"),
+      [true, false, true, true, true],
+      "Compact defaults, opt-out, rerenders, and disabled controls agree"
+    );
+    assert.deepEqual(
+      await page
+        .locator(".form-switch .form-check-input")
+        .first()
+        .evaluate((element) => {
+          const style = getComputedStyle(element);
+          return { width: style.width, height: style.height };
+        }),
+      { width: "44px", height: "24px" }
+    );
+    assert.equal(
+      await page.locator(".form-switch .form-check-input").evaluateAll((inputs) =>
+        inputs.every((input) => {
+          const toggle = input.getBoundingClientRect();
+          const row = input.closest(".form-switch").getBoundingClientRect();
+          return Math.abs(toggle.right - row.right) < 1 && Math.abs(toggle.top + toggle.height / 2 - row.top - row.height / 2) < 1;
+        })
+      ),
+      true,
+      "Every switch lines up at the right edge and center of its row"
+    );
     for (const width of [768, 1280]) {
       await page.setViewportSize({ width, height: 720 });
-      assert.equal(await page.locator("#controlsSize").evaluate((size) => {
-        const a = size.querySelector(".btn-group").getBoundingClientRect();
-        const b = document.querySelector("#controlsPosition .btn-group").getBoundingClientRect();
-        return Math.abs(a.top - b.top) < 1 && Math.abs(a.width - b.width) < 1 && a.right < b.left;
-      }), true, "Size and position controls share one evenly divided row");
+      assert.equal(
+        await page.locator("#controlsSize").evaluate((size) => {
+          const a = size.querySelector(".btn-group").getBoundingClientRect();
+          const b = document.querySelector("#controlsPosition .btn-group").getBoundingClientRect();
+          return Math.abs(a.top - b.top) < 1 && Math.abs(a.width - b.width) < 1 && a.right < b.left;
+        }),
+        true,
+        "Size and position controls share one evenly divided row"
+      );
     }
-    assert.deepEqual(await page.locator(".accordion-button").allTextContents().then((labels) => labels.map((label) => label.trim()).slice(0, 3)), ["Preview appearance", "Viewer controls", "Rendering"]);
+    assert.deepEqual(
+      await page
+        .locator(".accordion-button")
+        .allTextContents()
+        .then((labels) => labels.map((label) => label.trim()).slice(0, 3)),
+      ["Preview appearance", "Viewer controls", "Rendering"]
+    );
     assert.deepEqual(await page.locator("#options-json").evaluate((editor) => Object.keys(JSON.parse(editor.value)).slice(0, 18)), [
-      "theme", "palette", "fontFamily", "fontSize", "lineHeight", "controlsFont", "backgroundColor", "containerBackgroundColor", "textColor", "customThemeCSS",
-      "toolbar", "credits", "themeToggle", "fontSizeControls", "copyButton", "controlsCompact", "controlsSize", "controlsPosition"
+      "theme",
+      "palette",
+      "fontFamily",
+      "fontSize",
+      "lineHeight",
+      "controlsFont",
+      "backgroundColor",
+      "containerBackgroundColor",
+      "textColor",
+      "customThemeCSS",
+      "toolbar",
+      "credits",
+      "themeToggle",
+      "fontSizeControls",
+      "copyButton",
+      "controlsCompact",
+      "controlsSize",
+      "controlsPosition"
     ]);
     assert.equal(await page.locator(".intro h1 + p").textContent(), "Plain JavaScript. No dependencies. Open source. Free. Forever.");
     assert.ok((await page.locator("header .brand-mark").textContent()).trim());
 
     assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--bs-body-bg").trim()), "#141618");
     assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), "rgb(20, 22, 24)");
-    assert.equal(await page.locator('.source-editor').first().evaluate((element) => getComputedStyle(element).backgroundColor), "rgb(20, 22, 24)");
+    assert.equal(
+      await page
+        .locator(".source-editor")
+        .first()
+        .evaluate((element) => getComputedStyle(element).backgroundColor),
+      "rgb(20, 22, 24)"
+    );
     assert.equal(await page.locator('meta[name="theme-color"]').getAttribute("content"), "#141618");
     await page.locator("#site-theme").evaluate((button) => button.click());
     assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--bs-body-bg").trim()), "#fff");
@@ -549,10 +630,7 @@ test("family customization, navigation and monospace controls", async () => {
     assert.equal(await page.locator('[aria-label="Viewer suite"]').getByRole("link", { name: "DIFF", exact: true }).getAttribute("aria-current"), "page");
     assert.equal(await page.locator(".site-footer .fa-heart").count(), 1);
     assert.equal(await page.locator("header .fa-github").count(), 1);
-    assert.equal(
-      await page.evaluate(() => Boolean(document.querySelector('[aria-label="Viewer suite"]').compareDocumentPosition(document.querySelector("footer")) & Node.DOCUMENT_POSITION_FOLLOWING)),
-      true
-    );
+    assert.equal(await page.evaluate(() => Boolean(document.querySelector('[aria-label="Viewer suite"]').compareDocumentPosition(document.querySelector("footer")) & Node.DOCUMENT_POSITION_FOLLOWING)), true);
     await page.locator(".preview-appearance").evaluate((element) => {
       element.open = true;
     });
@@ -633,7 +711,11 @@ test("family customization, navigation and monospace controls", async () => {
     const fileSource = await sourceEditor.inputValue();
     await page.evaluate(() => {
       window.originalFileText = File.prototype.text;
-      File.prototype.text = function () { return new Promise((resolve) => { window.finishFileRead = resolve; }); };
+      File.prototype.text = function () {
+        return new Promise((resolve) => {
+          window.finishFileRead = resolve;
+        });
+      };
     });
     try {
       for (const action of ["edit", "restore", "sample"]) {
@@ -648,14 +730,17 @@ test("family customization, navigation and monospace controls", async () => {
         assert.equal(await sourceEditor.inputValue(), expected, "Late file reads preserve the newer source");
       }
     } finally {
-      await page.evaluate(() => { File.prototype.text = window.originalFileText; delete window.finishFileRead; delete window.originalFileText; });
+      await page.evaluate(() => {
+        File.prototype.text = window.originalFileText;
+        delete window.finishFileRead;
+        delete window.originalFileText;
+      });
     }
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();
   }
 });
-
 
 test("container themes are scoped, independent, and compatible with legacy links", async () => {
   const browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || undefined, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined });
@@ -666,13 +751,16 @@ test("container themes are scoped, independent, and compatible with legacy links
     await page.setContent('<div id="outside" class="dark">Host</div><div id="first" data-theme="dark"></div><div id="second" class="light"></div><div id="third"></div>');
     await page.addStyleTag({ path: path.join(__dirname, "../diff.css") });
     await page.addScriptTag({ path: path.join(__dirname, "../diff.js") });
-    await page.evaluate(async (args) => {
-      window.renderTheme = async (element) => {
-        const controller = window.byDIFFviewer(element, ...args);
-        if (controller?.ready) await controller.ready;
-      };
-      for (const id of ["first", "second", "third"]) await renderTheme(document.getElementById(id));
-    }, ["before\n","after\n"]);
+    await page.evaluate(
+      async (args) => {
+        window.renderTheme = async (element) => {
+          const controller = window.byDIFFviewer(element, ...args);
+          if (controller?.ready) await controller.ready;
+        };
+        for (const id of ["first", "second", "third"]) await renderTheme(document.getElementById(id));
+      },
+      ["before\n", "after\n"]
+    );
     const color = (id) => page.locator("#" + id).evaluate((element) => getComputedStyle(element).backgroundColor);
     assert.equal(await color("first"), "rgb(39, 40, 34)");
     assert.equal(await color("second"), "rgb(250, 250, 245)");
@@ -682,7 +770,13 @@ test("container themes are scoped, independent, and compatible with legacy links
     assert.equal(await page.locator("#first").getAttribute("data-theme"), "light");
     assert.equal(await color("second"), "rgb(250, 250, 245)");
     await page.locator("#second .byVIEWthemeToggle").click();
-    assert.equal(await page.locator("#second").getAttribute("class").then((classes) => classes.split(/\s+/).includes("dark")), true);
+    assert.equal(
+      await page
+        .locator("#second")
+        .getAttribute("class")
+        .then((classes) => classes.split(/\s+/).includes("dark")),
+      true
+    );
     assert.equal(await page.locator("#second").getAttribute("data-theme"), null);
     assert.equal(await color("second"), "rgb(39, 40, 34)");
     await page.evaluate(async () => {
@@ -742,14 +836,17 @@ test("named palettes retain mode, isolate custom CSS, and meet High Contrast tar
     await page.setContent('<div id="outside">Host</div><div id="viewer"></div><div id="other" data-theme="dark"></div>');
     await page.addStyleTag({ path: path.join(__dirname, "../diff.css") });
     await page.addScriptTag({ path: path.join(__dirname, "../diff.js") });
-    await page.evaluate(async (args) => {
-      window.renderPalette = async (id) => {
-        const controller = window.byDIFFviewer(document.getElementById(id), ...args);
-        if (controller?.ready) await controller.ready;
-      };
-      await renderPalette("viewer");
-      await renderPalette("other");
-    }, ["before\nsame\n","after\nsame\n"]);
+    await page.evaluate(
+      async (args) => {
+        window.renderPalette = async (id) => {
+          const controller = window.byDIFFviewer(document.getElementById(id), ...args);
+          if (controller?.ready) await controller.ready;
+        };
+        await renderPalette("viewer");
+        await renderPalette("other");
+      },
+      ["before\nsame\n", "after\nsame\n"]
+    );
     const root = page.locator("#viewer");
     const background = () => root.evaluate((element) => getComputedStyle(element).backgroundColor);
     assert.equal(await background(), "rgb(250, 250, 245)", "Default remains Monokai Light");
@@ -782,9 +879,15 @@ test("named palettes retain mode, isolate custom CSS, and meet High Contrast tar
         const style = getComputedStyle(element);
         const luminance = (color) => {
           const channels = color.startsWith("#")
-            ? color.slice(1).match(/../g).map((part) => parseInt(part, 16))
-            : color.match(/[\d.]+/g).slice(0, 3).map(Number);
-          const values = channels.map((channel) => channel / 255).map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+            ? color
+                .slice(1)
+                .match(/../g)
+                .map((part) => parseInt(part, 16))
+            : color
+                .match(/[\d.]+/g)
+                .slice(0, 3)
+                .map(Number);
+          const values = channels.map((channel) => channel / 255).map((value) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4));
           return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
         };
         const contrast = (a, b) => (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
@@ -809,19 +912,27 @@ test("named palettes retain mode, isolate custom CSS, and meet High Contrast tar
       element.dataset.theme = "github";
     });
     assert.equal(await background(), "rgb(13, 17, 23)", "Dark wins when both classes exist");
-    await root.evaluate((element) => { element.dataset.theme = "light"; });
+    await root.evaluate((element) => {
+      element.dataset.theme = "light";
+    });
     assert.equal(await background(), "rgb(250, 250, 245)", "Legacy mode aliases override classes");
     await page.addStyleTag({ content: '.byDIFFdocument.light[data-theme="ocean"] { --by-view-bg: #f3f8fc; } .byDIFFdocument.dark[data-theme="ocean"] { --by-view-bg: #102a43; }' });
-    await root.evaluate((element) => { element.dataset.theme = "ocean"; element.classList.remove("light", "dark"); });
+    await root.evaluate((element) => {
+      element.dataset.theme = "ocean";
+      element.classList.remove("light", "dark");
+    });
     await page.route("https://legacy.test/**", (route) => route.fulfill({ body: "", contentType: "text/css" }));
-    await page.evaluate(() => new Promise((resolve) => {
-      const link = document.createElement("link");
-      link.id = "byVIEWtheme";
-      link.rel = "stylesheet";
-      link.href = "https://legacy.test/diff.dark.css?cache=1#theme";
-      link.onload = resolve;
-      document.head.appendChild(link);
-    }));
+    await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          const link = document.createElement("link");
+          link.id = "byVIEWtheme";
+          link.rel = "stylesheet";
+          link.href = "https://legacy.test/diff.dark.css?cache=1#theme";
+          link.onload = resolve;
+          document.head.appendChild(link);
+        })
+    );
     await page.evaluate(() => renderPalette("viewer"));
     assert.equal(await background(), "rgb(250, 250, 245)", "An unclassified custom palette starts in Light");
     await root.locator(".byVIEWthemeToggle").click();
@@ -830,7 +941,6 @@ test("named palettes retain mode, isolate custom CSS, and meet High Contrast tar
     assert.equal(await page.locator("#byVIEWtheme").getAttribute("href"), "https://legacy.test/diff.dark.css?cache=1#theme");
     assert.equal(await page.locator("#other").evaluate((element) => getComputedStyle(element).backgroundColor), "rgb(39, 40, 34)");
     assert.equal(await page.locator("#outside").evaluate((element) => getComputedStyle(element).getPropertyValue("--by-view-muted")), "");
-
   } finally {
     await browser.close();
   }
@@ -842,7 +952,16 @@ test("playground palettes and editable two-mode custom themes stay synchronized"
     const page = await browser.newPage();
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await page.addInitScript(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (text) => { window.lastCopy = text; } } }));
+    await page.addInitScript(() =>
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: async (text) => {
+            window.lastCopy = text;
+          }
+        }
+      })
+    );
     await page.route("**/*", async (route) => {
       const url = new URL(route.request().url());
       if (url.href === "https://cdn.jsdelivr.net/gh/byuwur/spa.js@v20.6/css/bootstrap.min.css") return route.fulfill({ body: await getBootstrapCSS(), contentType: "text/css" });
@@ -864,12 +983,13 @@ test("playground palettes and editable two-mode custom themes stay synchronized"
     const defaults = await editor.inputValue();
     assert.ok(defaults.includes('.byDIFFdocument.light[data-theme="custom"]'));
     await palette.selectOption("github");
-    const setMode = (mode) => page.evaluate((mode) => {
-      const input = document.querySelector('#preview-theme, input[name="viewerTheme"][value="' + mode + '"], input[name="previewTheme"][value="' + mode + '"]');
-      if (input.tagName === "SELECT") input.value = mode;
-      else input.checked = true;
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-    }, mode);
+    const setMode = (mode) =>
+      page.evaluate((mode) => {
+        const input = document.querySelector('#preview-theme, input[name="viewerTheme"][value="' + mode + '"], input[name="previewTheme"][value="' + mode + '"]');
+        if (input.tagName === "SELECT") input.value = mode;
+        else input.checked = true;
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }, mode);
     await setMode("dark");
     assert.equal(await background(), "rgb(13, 17, 23)");
     await root.locator(".byVIEWthemeToggle").click();
@@ -883,7 +1003,9 @@ test("playground palettes and editable two-mode custom themes stay synchronized"
       await setMode("dark");
       assert.equal(await background(), name === "solarized" ? "rgb(0, 43, 54)" : "rgb(0, 0, 0)");
     }
-    await page.locator(".preview-appearance").evaluate((element) => { element.open = true; });
+    await page.locator(".preview-appearance").evaluate((element) => {
+      element.open = true;
+    });
     const custom = '.byDIFFdocument.light[data-theme="custom"] { --by-view-bg: #f3f8fc; }\n.byDIFFdocument.dark[data-theme="custom"] { --by-view-bg: #102a43; }';
     await editor.fill(custom);
     await page.waitForFunction(() => document.getElementById("preview-palette").value === "custom");
@@ -924,12 +1046,15 @@ test("viewer defaults, optional tools, and copy feedback", async () => {
     await page.setContent('<div id="viewer"></div>');
     await page.addStyleTag({ path: path.join(__dirname, "../diff.css") });
     await page.addScriptTag({ path: path.join(__dirname, "../diff.js") });
-    await page.evaluate((args) => {
-      window.renderUI = async (options = {}) => {
-        const result = byDIFFviewer(document.getElementById("viewer"), ...args, options);
-        await result?.ready;
-      };
-    }, ["needle\nold\n","needle\nnew\n"]);
+    await page.evaluate(
+      (args) => {
+        window.renderUI = async (options = {}) => {
+          const result = byDIFFviewer(document.getElementById("viewer"), ...args, options);
+          await result?.ready;
+        };
+      },
+      ["needle\nold\n", "needle\nnew\n"]
+    );
     await page.evaluate(() => renderUI());
     assert.equal(await page.locator(".byVIEWcontrols button").count(), 5);
     assert.equal(await page.locator(".byVIEWfontSizes").count(), 1);
@@ -944,25 +1069,32 @@ test("viewer defaults, optional tools, and copy feedback", async () => {
       for (const controlsSize of ["small", "regular", "large"]) {
         for (const font of ["ui-monospace, monospace", "Georgia, serif"]) {
           for (const mode of ["light", "dark"]) {
-            const errors = await page.evaluate(async ({ scale, controlsSize, font, mode }) => {
-              document.documentElement.style.fontSize = `${scale}rem`;
-              const host = document.getElementById("viewer");
-              host.dataset.theme = mode;
-              host.style.setProperty("--by-view-controls-font", font);
-              await renderUI({ controlsSize });
-              const button = host.querySelector(".byVIEWthemeToggle");
-              const rect = button.getBoundingClientRect();
-              const style = getComputedStyle(button), thumb = getComputedStyle(button, "::after");
-              const innerWidth = rect.width - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth);
-              const innerHeight = rect.height - parseFloat(style.borderTopWidth) - parseFloat(style.borderBottomWidth);
-              const position = (value, extent) => value.endsWith("%") ? parseFloat(value) * extent / 100 : parseFloat(value);
-              const centerX = rect.left + parseFloat(style.borderLeftWidth) + position(thumb.left, innerWidth);
-              const centerY = rect.top + parseFloat(style.borderTopWidth) + position(thumb.top, innerHeight);
-              const icons = [...button.querySelectorAll("svg")];
-              const icon = icons[mode === "dark" ? 1 : 0].getBoundingClientRect();
-              return [Math.abs(centerX - icon.x - icon.width / 2), Math.abs(centerY - icon.y - icon.height / 2), Math.abs(centerY - rect.y - rect.height / 2)];
-            }, { scale, controlsSize, font, mode });
-            assert.ok(errors.every((error) => error < 0.06), `${scale} ${controlsSize} ${font} ${mode}: ${errors}`);
+            const errors = await page.evaluate(
+              async ({ scale, controlsSize, font, mode }) => {
+                document.documentElement.style.fontSize = `${scale}rem`;
+                const host = document.getElementById("viewer");
+                host.dataset.theme = mode;
+                host.style.setProperty("--by-view-controls-font", font);
+                await renderUI({ controlsSize });
+                const button = host.querySelector(".byVIEWthemeToggle");
+                const rect = button.getBoundingClientRect();
+                const style = getComputedStyle(button),
+                  thumb = getComputedStyle(button, "::after");
+                const innerWidth = rect.width - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth);
+                const innerHeight = rect.height - parseFloat(style.borderTopWidth) - parseFloat(style.borderBottomWidth);
+                const position = (value, extent) => (value.endsWith("%") ? (parseFloat(value) * extent) / 100 : parseFloat(value));
+                const centerX = rect.left + parseFloat(style.borderLeftWidth) + position(thumb.left, innerWidth);
+                const centerY = rect.top + parseFloat(style.borderTopWidth) + position(thumb.top, innerHeight);
+                const icons = [...button.querySelectorAll("svg")];
+                const icon = icons[mode === "dark" ? 1 : 0].getBoundingClientRect();
+                return [Math.abs(centerX - icon.x - icon.width / 2), Math.abs(centerY - icon.y - icon.height / 2), Math.abs(centerY - rect.y - rect.height / 2)];
+              },
+              { scale, controlsSize, font, mode }
+            );
+            assert.ok(
+              errors.every((error) => error < 0.06),
+              `${scale} ${controlsSize} ${font} ${mode}: ${errors}`
+            );
           }
         }
       }
@@ -973,7 +1105,9 @@ test("viewer defaults, optional tools, and copy feedback", async () => {
       await renderUI();
     });
     for (const mode of ["light", "dark"]) {
-      await page.locator("#viewer").evaluate((element, mode) => { element.dataset.theme = mode; }, mode);
+      await page.locator("#viewer").evaluate((element, mode) => {
+        element.dataset.theme = mode;
+      }, mode);
       await page.evaluate(() => renderUI({ toolbar: false, controlsPosition: "bottom", sorting: false, pagination: false, collapsible: false, details: false, lineNumbers: false, loadMore: false }));
       assert.equal(await page.locator("#viewer :is(button, input, select, summary):visible").count(), 0);
       assert.equal(await page.locator(".byVIEWtoolbar").count(), 0);
@@ -990,20 +1124,31 @@ test("viewer defaults, optional tools, and copy feedback", async () => {
     assert.equal(await page.locator(".byVIEWcontrols button").count(), 5);
     await page.evaluate(() => renderUI({ credits: false, themeToggle: false, fontSizeControls: false, copyButton: false }));
     assert.equal(await page.locator(".byVIEWtoolbar").count(), 0);
-    await page.evaluate((options) => renderUI({ fontSizeControls: true, ...options }), {"viewSelect":true,"copyOldButton":true,"statusBar":true});
+    await page.evaluate((options) => renderUI({ fontSizeControls: true, ...options }), { viewSelect: true, copyOldButton: true, statusBar: true });
     assert.equal(await page.locator(".byVIEWfontSize").count(), 3);
     assert.equal(await page.locator(".byVIEWpanel > .byVIEWstatus:visible").count(), 1);
     assert.ok(await page.locator(".byVIEWpanel > .byVIEWstatus").evaluate((status) => parseFloat(getComputedStyle(status).borderBottomWidth) > 0));
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await page.evaluate(() => {
-      Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => { throw new Error("Denied"); } } });
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: async () => {
+            throw new Error("Denied");
+          }
+        }
+      });
     });
     await page.locator(".byVIEWcopy").click();
     await page.mouse.move(0, 0);
     await page.locator(".byVIEWcopy").evaluate((element) => element.blur());
     assert.equal(await page.locator(".byVIEWcopy").getAttribute("data-state"), "error");
     assert.equal(await page.locator(".byVIEWcopy").textContent(), "Failed");
-    await page.evaluate(() => { navigator.clipboard.writeText = async (value) => { window.copiedSource = value; }; });
+    await page.evaluate(() => {
+      navigator.clipboard.writeText = async (value) => {
+        window.copiedSource = value;
+      };
+    });
     await page.locator(".byVIEWcopy").click();
     assert.equal(await page.locator(".byVIEWcopy").getAttribute("data-state"), "success");
     assert.match(await page.evaluate(() => copiedSource), /needle/);
