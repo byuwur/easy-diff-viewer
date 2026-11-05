@@ -146,7 +146,7 @@
   min-width: 0;
   max-width: 100%;
   margin: 0;
-  padding: 0 1rem 1.5rem;
+  padding: 0 1rem 0.75rem;
   border: 0.0625rem solid var(--by-view-border);
   border-radius: var(--by-view-radius, 0.75rem);
   background: var(--by-view-document-bg, var(--by-view-bg));
@@ -168,6 +168,9 @@
 .byDIFFdocument .byVIEWcontent {
   min-width: 0;
   flex: 1 0 auto;
+}
+.byDIFFdocument > .byVIEWcontent:first-child {
+  padding-top: 0.75rem;
 }
 .byDIFFdocument button,
 .byDIFFdocument input,
@@ -273,7 +276,7 @@
 }
 .byDIFFdocument .byVIEWpanel {
   min-width: 0;
-  margin: 0.375em 0;
+  margin: 0;
   overflow: hidden;
   border: 0.0625rem solid var(--by-view-border);
   border-radius: var(--by-view-radius, 0.65em);
@@ -318,7 +321,6 @@
   font-size: 1.25rem;
 }
 .byDIFFdocument.byVIEWbottom {
-  padding-top: 1rem;
   padding-bottom: 0;
 }
 .byDIFFdocument.byVIEWcompact > .byVIEWtoolbar {
