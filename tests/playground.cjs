@@ -356,7 +356,7 @@ test("family customization, navigation and monospace controls", async () => {
         .then((labels) => labels.map((label) => label.trim()).slice(0, 3)),
       ["Preview appearance", "Viewer controls", "Rendering"]
     );
-    assert.deepEqual(await page.locator("#options-json").evaluate((editor) => Object.keys(JSON.parse(editor.value)).slice(0, 19)), [
+    assert.deepEqual(await page.locator("#options-json").evaluate((editor) => Object.keys(JSON.parse(editor.value)).slice(0, 20)), [
       "theme",
       "palette",
       "fontFamily",
@@ -374,6 +374,7 @@ test("family customization, navigation and monospace controls", async () => {
       "copyButton",
       "controlsCompact",
       "animations",
+      "appearAnimation",
       "controlsSize",
       "controlsPosition"
     ]);
@@ -427,6 +428,7 @@ test("family customization, navigation and monospace controls", async () => {
         input.dispatchEvent(new Event("change", { bubbles: true }));
       }
     });
+    await frame.waitForFunction((selector) => getComputedStyle(document.querySelector(selector)).backgroundColor === "rgb(18, 52, 86)", ".byDIFFdocument");
     assert.deepEqual(
       await root.evaluate((element) => {
         const style = getComputedStyle(element);
@@ -572,7 +574,26 @@ test("playground palettes and editable two-mode custom themes stay synchronized"
     const root = frame.locator(".byDIFFdocument");
     const editor = page.locator("#custom-theme-css");
     const palette = page.locator("#preview-palette");
-    const background = () => root.evaluate((element) => getComputedStyle(element).backgroundColor);
+    const background = () => root.evaluate((element) => { for (const animation of element.getAnimations()) if (animation.transitionProperty === "background-color") animation.finish(); return getComputedStyle(element).backgroundColor; });
+    const headerSettings = page.locator('#credits, #themeToggle, #fontSizeControls, #copyButton, #controlsCompact, [name="controlsSize"], [name="controlsPosition"]');
+    const selectedSettings = await headerSettings.evaluateAll((controls) => controls.map((control) => [control.value, control.checked]));
+    await page.locator("#toolbar").uncheck();
+    await page.waitForFunction(() => document.getElementById("credits").disabled);
+    assert.equal(await headerSettings.evaluateAll((controls) => controls.every((control) => control.disabled)), true);
+    assert.equal(await page.locator("#animations").isEnabled(), true, "Content motion is independent of the viewer header");
+    if (await page.locator("#displayContainer").count()) assert.equal(await page.locator("#displayContainer").isEnabled(), true);
+    assert.deepEqual(await headerSettings.evaluateAll((controls) => controls.map((control) => [control.value, control.checked])), selectedSettings);
+    await page.locator("#toolbar").check();
+    await page.waitForFunction(() => !document.getElementById("credits").disabled);
+    assert.equal(await headerSettings.evaluateAll((controls) => controls.every((control) => !control.disabled)), true);
+    assert.equal(await page.locator("#appearAnimation").isChecked(), false);
+    await page.locator("#appearAnimation").check();
+    await page.locator("#animations").uncheck();
+    await page.waitForFunction(() => document.getElementById("appearAnimation").disabled);
+    assert.equal(await page.locator("#appearAnimation").isChecked(), true, "Disabling motion preserves the entrance preference");
+    await page.locator("#animations").check();
+    await page.waitForFunction(() => !document.getElementById("appearAnimation").disabled);
+    await page.locator("#appearAnimation").uncheck();
     const initialBackground = await background();
     const hostBackground = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
     assert.equal(await palette.inputValue(), "monokai");
