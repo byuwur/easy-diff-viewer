@@ -69,20 +69,21 @@ Use `--by-diff-add` and `--by-diff-remove` on `.byDIFFdocument` to customize cha
 
 ## Shared controls and lifecycle
 
-| Option             | Default     | Behavior                                                                     |
-| ------------------ | ----------- | ---------------------------------------------------------------------------- |
-| `toolbar`          | `true`      | Show the viewer header; secondary tools are configured separately.           |
-| `credits`          | `true`      | Show attribution in the header.                                              |
-| `statusBar`        | `true`      | Show counts and metadata. Loading, errors, and empty results remain visible. |
-| `viewSelect`       | `false`     | Show segmented Unified / Side by side buttons.                               |
-| `copyOldButton`    | `false`     | Show a separate button to copy the old source.                               |
-| `loadMore`         | `true`      | Load differences in batches; false displays every line.                      |
-| `themeToggle`      | `true`      | Show the theme toggle.                                                       |
-| `fontSizeControls` | `true`      | Show text-size controls.                                                     |
-| `copyButton`       | `true`      | Show full source copy button.                                                |
-| `controlsSize`     | `"regular"` | `"small"`, `"regular"`, or `"large"`; invalid values use `"regular"`.        |
-| `controlsCompact`  | `true`      | Keep credits beside controls; `false` stacks them. Wraps as needed.          |
-| `controlsPosition` | `"top"`     | Sticky `"top"` or `"bottom"` toolbar; invalid values use `"top"`.            |
+| Option             | Default     | Behavior                                                                                                             |
+| ------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------- |
+| `animations`       | `true`      | Brief control/disclosure motion. `true` enables it and `false` disables it, overriding the system motion preference. |
+| `toolbar`          | `true`      | Show the viewer header; secondary tools are configured separately.                                                   |
+| `credits`          | `true`      | Show attribution in the header.                                                                                      |
+| `statusBar`        | `true`      | Show counts and metadata. Loading, errors, and empty results remain visible.                                         |
+| `viewSelect`       | `false`     | Show segmented Unified / Side by side buttons.                                                                       |
+| `copyOldButton`    | `false`     | Show a separate button to copy the old source.                                                                       |
+| `loadMore`         | `true`      | Load differences in batches; false displays every line.                                                              |
+| `themeToggle`      | `true`      | Show the theme toggle.                                                                                               |
+| `fontSizeControls` | `true`      | Show text-size controls.                                                                                             |
+| `copyButton`       | `true`      | Show full source copy button.                                                                                        |
+| `controlsSize`     | `"regular"` | `"small"`, `"regular"`, or `"large"`; invalid values use `"regular"`.                                                |
+| `controlsCompact`  | `true`      | Keep credits beside controls; `false` stacks them. Wraps as needed.                                                  |
+| `controlsPosition` | `"top"`     | Sticky `"top"` or `"bottom"` toolbar; invalid values use `"top"`.                                                    |
 
 The controller exposes `ready` and `destroy()`. `ready` resolves `true` after initial rendering, or `false` on a displayed data error or cancellation. Invalid targets/options can throw synchronously.
 
@@ -111,6 +112,8 @@ Use `toolbar: false` to hide the header, or disable `credits`, `themeToggle`, `f
 Controls use monospace by default; override `--by-view-controls-font` to change it.
 
 ## Themes
+
+Initial content appears immediately. Animations affect controls and deliberate show/hide actions; rows, tokens, and typing are not animated. Disclosure size/exit transitions progressively enhance browsers that support them.
 
 The outer document and inner surfaces have independent CSS backgrounds. Both follow the selected theme unless overridden. Set `--by-view-document-bg: #0000` to reveal the host page while keeping content panels and individual controls readable. `--by-view-container-bg` sets the shared background of those panels and controls; it also accepts alpha colors or `transparent`. The toolbar and credits have no background. These overrides survive theme changes.
 

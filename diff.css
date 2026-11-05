@@ -440,7 +440,7 @@
   pointer-events: none;
   border-radius: 50%;
   background: currentColor;
-  transition: left 0.2s;
+  transition: left var(--by-view-motion-duration, 0s) ease-out;
 }
 
 .byDIFFdocument .byVIEWactions {
@@ -461,8 +461,8 @@
   -webkit-tap-highlight-color: #0000;
   touch-action: manipulation;
   transition:
-    background-color 0.15s,
-    box-shadow 0.15s;
+    background-color var(--by-view-motion-duration, 0s) ease,
+    box-shadow var(--by-view-motion-duration, 0s) ease-out;
 }
 .byDIFFdocument button:not(:disabled):hover {
   background: color-mix(in srgb, currentColor 7%, var(--by-view-container-bg, var(--by-view-bg)));
@@ -484,12 +484,6 @@
 }
 .byDIFFdocument .byVIEWactions:empty {
   display: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .byDIFFdocument button,
-  .byDIFFdocument .byVIEWthemeToggle::after {
-    transition: none;
-  }
 }
 .byDIFFdocument .byVIEWactions {
   gap: 0.375em;
@@ -547,4 +541,71 @@
 .byDIFFdocument .byVIEWsegments input:focus-visible + span {
   outline: 0.125rem solid var(--by-view-accent);
   outline-offset: -0.125rem;
+}
+
+/* --- MOTION --- */
+/* Initial document content is immediate; motion belongs to controls and disclosures. */
+.byDIFFdocument {
+  --by-view-motion-duration: 0s;
+}
+.byDIFFdocument.byVIEWmotion {
+  --by-view-motion-duration: 0.18s;
+}
+.byDIFFdocument :is(button, input, select, textarea, summary, a) {
+  transition:
+    background-color var(--by-view-motion-duration) ease,
+    color var(--by-view-motion-duration) ease,
+    border-color var(--by-view-motion-duration) ease,
+    box-shadow var(--by-view-motion-duration) ease,
+    opacity var(--by-view-motion-duration) ease,
+    translate var(--by-view-motion-duration) ease-out;
+}
+.byDIFFdocument.byVIEWmotion :is(button, summary):not(:disabled):active {
+  translate: 0 0.0625em;
+}
+.byDIFFdocument.byVIEWmotion details::details-content {
+  interpolate-size: allow-keywords;
+  block-size: 0;
+  opacity: 0;
+  overflow: clip;
+  transition:
+    block-size var(--by-view-motion-duration) ease,
+    opacity var(--by-view-motion-duration) ease,
+    content-visibility var(--by-view-motion-duration) allow-discrete;
+}
+.byDIFFdocument.byVIEWmotion details[open]::details-content {
+  block-size: auto;
+  opacity: 1;
+}
+/* Disabling motion also cancels host-page transitions inside this viewer. */
+.byDIFFdocument:not(.byVIEWmotion),
+.byDIFFdocument:not(.byVIEWmotion) *,
+.byDIFFdocument:not(.byVIEWmotion) *::before,
+.byDIFFdocument:not(.byVIEWmotion) *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* High Contrast switches colors immediately so intermediate colors cannot lose contrast. */
+.byDIFFdocument[data-theme="high-contrast"] :is(button, input, select, textarea, summary, a) {
+  transition-property: opacity, translate;
+}
+@media (forced-colors: active) {
+  .byDIFFdocument :is(button, input, select, textarea, summary, a) {
+    transition-property: opacity, translate;
+  }
+}
+
+@media print {
+  .byDIFFdocument,
+  .byDIFFdocument *,
+  .byDIFFdocument *::before,
+  .byDIFFdocument *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.byDIFFdocument .byVIEWinfo {
+  transition: opacity var(--by-view-motion-duration) ease-out;
 }
