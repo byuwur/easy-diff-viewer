@@ -282,6 +282,16 @@
   border-radius: var(--by-view-radius, 0.65em);
   background: var(--by-view-container-bg, var(--by-view-bg));
 }
+.byDIFFdocument.byVIEWplain .byVIEWpanel {
+  border: 0;
+  border-radius: 0;
+}
+.byDIFFdocument.byVIEWplain .byVIEWstatus {
+  display: none;
+}
+.byDIFFdocument.byVIEWplain .byVIEWpanel > :not(.byVIEWstatus) {
+  padding-inline: 0;
+}
 .byDIFFdocument .byVIEWpanel > .byVIEWstatus {
   margin: 0;
   padding: 0.375em 0.625em;
