@@ -28,7 +28,7 @@
     <meta name="twitter:description" content="Compare two texts with aligned side-by-side or unified diffs, line numbers, and whitespace options. A free JavaScript diff viewer by BONYUR." />
     <meta name="twitter:image" content="https://byuwur.github.io/easy-diff-viewer/prev.jpg" />
     <meta name="twitter:image:alt" content="easy-diff-viewer by BONYUR: Text differences playground, options, source editor, and live preview." />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/byuwur/spa.js@v20.7/css/shards.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/byuwur/spa.js@v20.7/css/shards.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/byuwur/spa.js@v20.7/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/byuwur/spa.js@v20.7/css/pickr.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/byuwur/spa.js@v20.7/css/fontawesome.min.css" />
@@ -36,8 +36,8 @@
     <script src="https://cdn.jsdelivr.net/gh/byuwur/spa.js@v20.7/js/popper.min.js" defer=""></script>
     <script src="https://cdn.jsdelivr.net/gh/byuwur/spa.js@v20.7/js/bootstrap.min.js" defer=""></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/byuwur/spa.js@v20.7/css/animate.min.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/byuwur/easy-code-viewer@v1.5/code.css" />
-    <script src="https://cdn.jsdelivr.net/gh/byuwur/easy-code-viewer@v1.5/code.js" defer></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/byuwur/easy-code-viewer@v1.5/code.min.css" />
+    <script src="https://cdn.jsdelivr.net/gh/byuwur/easy-code-viewer@v1.5/code.min.js" defer></script>
   </head>
 
   <body class="byVIEWmotion">
@@ -1138,6 +1138,7 @@ Last line
         const installButtons = [...document.querySelectorAll("[data-install]")];
         const updateIntegration = (mode = "cdn") => {
           const base = mode === "cdn" ? "https://cdn.jsdelivr.net/gh/byuwur/easy-diff-viewer@latest/" : "";
+          const min = mode === "cdn" ? ".min" : "";
           const endScript = "</" + "script>";
           // Explicit lines preserve export indentation when the page is formatted.
           const html = [
@@ -1147,8 +1148,8 @@ Last line
             '    <meta charset="utf-8">',
             '    <meta name="viewport" content="width=device-width, initial-scale=1">',
             "    <title>easy-diff-viewer</title>",
-            `    <link rel="stylesheet" href="${base}diff.css">`,
-            `    <script src="${base}diff.js" defer>${endScript}`,
+            `    <link rel="stylesheet" href="${base}diff${min}.css">`,
+            `    <script src="${base}diff${min}.js" defer>${endScript}`,
             "  </head>",
             "  <body>",
             '    <div id="viewer" data-theme="light"></div>',
@@ -1431,7 +1432,11 @@ Last line
           const loadPalette = () => {
             clearTimeout(themeTimer);
             if (!target()) return;
-            if (!["monokai", "github", "solarized", "high-contrast", "custom"].includes(palette.value) && !themesWarned && frame.contentWindow.getComputedStyle(frame.contentDocument.documentElement).getPropertyValue("--by-diff-themes-loaded").trim() !== "1") {
+            if (
+              !["monokai", "github", "solarized", "high-contrast", "custom"].includes(palette.value) &&
+              !themesWarned &&
+              frame.contentWindow.getComputedStyle(frame.contentDocument.documentElement).getPropertyValue("--by-diff-themes-loaded").trim() !== "1"
+            ) {
               themesWarned = true;
               console.warn(`easy-diff-viewer: Import diff.themes.css after diff.css to use "${palette.value}".`);
             }
