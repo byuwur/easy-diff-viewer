@@ -250,6 +250,8 @@
 .byDIFFdocument :is(.byDIFFnumber, .byDIFFmarker) {
   color: var(--by-view-secondary);
   width: 1%;
+  white-space: nowrap;
+  overflow-wrap: normal;
   text-align: right;
   user-select: none;
   font: 0.85em/var(--by-view-line-height, 1.5) var(--by-view-content-font, ui-monospace, monospace);

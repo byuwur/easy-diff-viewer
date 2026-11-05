@@ -139,6 +139,37 @@ test("DIFF standalone browser contracts", async (t) => {
       await page.locator(".byVIEWcopy").click();
       assert.equal(await page.evaluate(() => copies.at(-1)), "new");
     });
+    await t.test("multi-digit line numbers stay on one line in unified and split views", async () => {
+      for (const view of ["unified", "split"]) {
+        for (const fontSize of ["1rem", "1.5rem"]) {
+          const result = await page.evaluate(
+            async ({ view, fontSize }) => {
+              const source = Array.from({ length: 123 }, (_, index) => `Line ${index + 1}`).join("\n");
+              const previousWidth = root.style.width,
+                previousFontSize = root.style.fontSize;
+              root.style.width = "20rem";
+              root.style.fontSize = fontSize;
+              await byDIFFviewer(root, source, source, { view, loadMore: false }).ready;
+              const cells = [...root.querySelectorAll(".byDIFFnumber")].filter((cell) => ["10", "100", "123"].includes(cell.textContent));
+              const failures = cells
+                .filter((cell) => {
+                  const range = document.createRange();
+                  range.selectNodeContents(cell);
+                  const style = getComputedStyle(cell);
+                  const available = cell.getBoundingClientRect().width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+                  return range.getClientRects().length !== 1 || range.getBoundingClientRect().width > available + 0.1;
+                })
+                .map((cell) => cell.textContent);
+              root.style.width = previousWidth;
+              root.style.fontSize = previousFontSize;
+              return { count: cells.length, failures };
+            },
+            { view, fontSize }
+          );
+          assert.deepEqual(result, { count: 6, failures: [] }, `${view}, ${fontSize}: digits must fit without wrapping or clipping`);
+        }
+      }
+    });
     await t.test("safe text, malformed API, empty input, and comparison limits", async () => {
       const result = await page.evaluate(async () => {
         let invalid = false;
