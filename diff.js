@@ -7,16 +7,16 @@
  * MIT License (see LICENSE).
  */
 (function (global) {
-  /* --- INITIALIZATION --- */
+  // --- INITIALIZATION ---
   if (global.byDIFFviewer?.initialized) return;
 
-  /* --- METADATA --- */
+  // --- METADATA ---
   byDIFFviewer.VERSION = "1.4"; // 2026-11-05
 
-  /* --- STATE --- */
+  // --- STATE ---
   const instances = new WeakMap();
   let nextViewId = 0;
-  /* --- HELPERS --- */
+  // --- HELPERS ---
   const node = (tag, className = "", text) => {
     const element = document.createElement(tag);
     element.className = className;
@@ -58,10 +58,10 @@
     control.addEventListener("focusout", reset);
     return control;
   };
-  /** Yield at a chunk boundary so input events and replacement renders can run. */
+  // Yield at a chunk boundary so input events and replacement renders can run.
   const pause = () => new Promise((resolve) => setTimeout(resolve, 0));
   const positive = (value, fallback, maximum) => (Number.isInteger(value) && value > 0 ? Math.min(value, maximum) : fallback);
-  /* --- APPEARANCE --- */
+  // --- APPEARANCE ---
   const extraPalettes = new Set([
     "dracula",
     "darcula",
@@ -117,7 +117,7 @@
     console.warn(`easy-diff-viewer: Palette "${palette}" requires diff.themes.css. Import it after diff.css. https://byuwur.github.io/easy-diff-viewer/`);
   };
 
-  /** Explicit appearance options override markup; omitted values preserve the container's state. */
+  // Explicit appearance options override markup; omitted values preserve the container's state.
   const applyAppearance = (element, options) => {
     const { theme, palette, fontSize } = options;
     if (theme != null && !["light", "dark"].includes(theme)) throw new RangeError("Theme must be light or dark.");
@@ -138,7 +138,7 @@
     }
   };
 
-  /* --- CONTROLS --- */
+  // --- CONTROLS ---
   // Mirrored across the family so each viewer can run without a shared runtime.
   /**
    * Adds container light/dark controls, retaining legacy stylesheet links as a fallback.
@@ -298,7 +298,7 @@
     });
   };
 
-  /* --- PARSING --- */
+  // --- PARSING ---
   const splitLines = (source) => {
     if (typeof source !== "string") throw new TypeError("Diff inputs must be strings.");
     if (source.length > 2000000) throw new RangeError("Each diff input is limited to 2 million characters.");
@@ -309,7 +309,7 @@
     if (lines.length > 20000) throw new RangeError("Each diff input is limited to 20,000 lines.");
     return lines;
   };
-  /** Yield comparison checkpoints and return a bounded Myers edit script with original line payloads. */
+  // Yield comparison checkpoints and return a bounded Myers edit script with original line payloads.
   function* compare(oldSource, newSource, options = {}) {
     const before = splitLines(oldSource),
       after = splitLines(newSource);
@@ -388,7 +388,7 @@
     return output;
   }
 
-  /* --- RENDERING --- */
+  // --- RENDERING ---
   // Align replacements within each change block without changing the public edit list.
   const pairChanges = (edits) => {
     const rows = [];
@@ -418,9 +418,9 @@
     return rows;
   };
 
-  /* --- LIFECYCLE --- */
+  // --- LIFECYCLE ---
   // One instance owns the container; replacement disposes its pending work first.
-  /** Replace the previous owner and return its cancellable state. Only the current owner may clear the host. */
+  // Replace the previous owner and return its cancellable state. Only the current owner may clear the host.
   const mount = (element, options, getText) => {
     if (!(element instanceof HTMLElement)) throw new TypeError("byDIFFviewer: element must be an HTMLElement.");
     applyAppearance(element, options);
@@ -493,8 +493,8 @@
     return state;
   };
 
-  /* --- PUBLIC API --- */
-  /** Compare two strings without executing either. ready resolves after the first display batch. */
+  // --- PUBLIC API ---
+  // Compare two strings without executing either. ready resolves after the first display batch.
   function byDIFFviewer(element, oldSource, newSource, options = {}) {
     if (typeof oldSource !== "string" || typeof newSource !== "string") throw new TypeError("Diff inputs must be strings.");
     options = { view: "unified", lineNumbers: true, batchSize: 500, ...options };
@@ -562,7 +562,7 @@
       appendLineText(cell, text, kind);
       row.appendChild(cell);
     };
-    /* --- RENDERING --- */
+    // --- RENDERING ---
     const render = () => {
       if (!state.active) return;
       const head = node("thead"),
@@ -635,7 +635,7 @@
     } while (!step.done);
     return step.value;
   };
-  /* --- EXPORT --- */
+  // --- EXPORT ---
   global.byDIFFviewer = byDIFFviewer;
   byDIFFviewer.initialized = true;
 })(typeof window !== "undefined" ? window : this);
