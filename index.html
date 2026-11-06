@@ -425,12 +425,7 @@
                   spellcheck="false"
                   autocapitalize="off"
                   autocomplete="off"
-                  title="Ctrl / ⌘ + Enter to render. Tab moves focus.">
-A small document
-Keep this line
-Old wording
-Last line
-</textarea
+                  title="Ctrl / ⌘ + Enter to render. Tab moves focus."></textarea
                 ><label class="px-3 small" for="second">New text</label
                 ><textarea
                   id="second"
@@ -439,14 +434,7 @@ Last line
                   spellcheck="false"
                   autocapitalize="off"
                   autocomplete="off"
-                  title="Ctrl / ⌘ + Enter to render. Tab moves focus.">
-A small document
-An added line
-Keep this line
-New wording
-Last line
-</textarea
-                >
+                  title="Ctrl / ⌘ + Enter to render. Tab moves focus."></textarea>
               </div>
               <div id="source-status" class="panel-footer text-break border-top px-4 py-2 small font-monospace text-body-secondary" role="status">Edit to render</div>
             </section>
@@ -937,6 +925,15 @@ Last line
         const themeInputs = [...document.querySelectorAll('[name="previewTheme"]')];
         const error = document.getElementById("source-error");
         const status = document.getElementById("render-status");
+        // prettier-ignore
+        const samples = {
+          default: {"name": "Default showcase", "source": "A small document\nKeep this line\nOld wording\nLast line\n", "second": "A small document\nAn added line\nKeep this line\nNew wording\nLast line\n"},
+          insert: {"name": "Additions", "source": "First\nLast\n", "second": "First\nInserted\nLast\n"},
+          whitespace: {"name": "Whitespace", "source": "  const value = 1;\n", "second": "const value = 1;\n"},
+          newline: {"name": "Final newline", "source": "Same text", "second": "Same text\n"},
+        };
+        source.value = samples.default.source;
+        second.value = samples.default.second;
         const initialSource = source.value;
         const initialSecond = second?.value;
         const defaults = {
@@ -1267,14 +1264,10 @@ Last line
         document.getElementById("year-txt").textContent = new Date().getFullYear();
 
         // --- EXAMPLES ---
-        const examples = {
-          insert: { label: "Additions", source: "First\nLast\n", second: "First\nInserted\nLast\n" },
-          whitespace: { label: "Whitespace", source: "  const value = 1;\n", second: "const value = 1;\n" },
-          newline: { label: "Final newline", source: "Same text", second: "Same text\n" }
-        };
+
         document.querySelectorAll("[data-example]").forEach((button) =>
           button.addEventListener("click", () => {
-            const example = examples[button.dataset.example];
+            const example = samples[button.dataset.example];
             ++sourceVersion;
             source.value = example.source;
             if (second) second.value = example.second;
