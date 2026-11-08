@@ -125,6 +125,7 @@
     warnMissingThemes(element, palette ?? element.dataset.theme);
     const size = typeof fontSize === "number" ? `${Math.max(0.5, Math.min(3, fontSize))}rem` : typeof fontSize === "string" ? `clamp(0.5rem, ${fontSize}, 3rem)` : "";
     if (fontSize != null && (typeof fontSize === "number" ? !Number.isFinite(fontSize) : typeof fontSize !== "string" || !CSS.supports("font-size", size))) throw new RangeError("Font size must be a finite multiplier or a CSS size.");
+    // Keep palette identity in data-theme while light/dark classes select its mode.
     if (theme != null || palette != null) {
       const mode = theme ?? (["light", "dark"].includes(element.dataset.theme) ? element.dataset.theme : element.classList.contains("dark") ? "dark" : "light");
       element.classList.toggle("light", mode === "light");
@@ -208,6 +209,7 @@
    * @return {HTMLElement} The text size button group.
    */
   const appendFontSizeControls = (element, controls) => {
+    // Remember the caller's initial size so Reset also works after this toolbar is recreated.
     element.dataset.byViewDefaultFontSize ??= element.style.fontSize;
     const sizes = document.createElement("div");
     sizes.className = "byVIEWfontSizes";
@@ -323,6 +325,7 @@
     const operation = (type, x, y) => ({ type, oldLine: x === null ? null : x + 1, newLine: y === null ? null : y + 1, oldText: x === null ? null : before[x], newText: y === null ? null : after[y] });
     let prefix = 0,
       suffix = 0;
+    // Trim unchanged edges before spending the comparison budget on the changed middle.
     while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) prefix++;
     while (suffix < a.length - prefix && suffix < b.length - prefix && a[a.length - 1 - suffix] === b[b.length - 1 - suffix]) suffix++;
     const n = a.length - prefix - suffix,
@@ -338,6 +341,7 @@
         frontier = new Map([[1, 0]]);
       let work = 0,
         distance = -1;
+      // Bound saved frontiers as well as comparisons so unrelated large inputs fail predictably.
       search: for (let d = 0; d <= Math.min(n + m, 1000); d++) {
         trace.push(new Map(frontier));
         for (let k = -d; k <= d; k += 2) {
@@ -382,6 +386,7 @@
           x--;
         }
       }
+      // Backtracking discovers edits from the end; restore source order before reattaching the unchanged suffix.
       output.push(...edits.reverse());
     }
     for (let i = suffix; i > 0; i--) output.push(operation("equal", a.length - i, b.length - i));
@@ -423,6 +428,7 @@
   // Replace the previous owner and return its cancellable state. Only the current owner may clear the host.
   const mount = (element, options, getText) => {
     if (!(element instanceof HTMLElement)) throw new TypeError("byDIFFviewer: element must be an HTMLElement.");
+    // Validate appearance before disposing the current instance, so invalid options leave it usable.
     applyAppearance(element, options);
     const painted = element.classList.contains("byVIEWready");
     instances.get(element)?.destroy();
@@ -431,6 +437,7 @@
       if (!state.active) return;
       state.active = false;
       cancelAnimationFrame(state.motionFrame);
+      // An old controller must not clear a replacement mounted on the same element.
       if (instances.get(element) === state) {
         instances.delete(element);
         element.replaceChildren();
@@ -506,6 +513,7 @@
     const viewControl = node("div", "byVIEWsegments");
     viewControl.setAttribute("role", "group");
     viewControl.setAttribute("aria-label", "Diff view");
+    // Each instance needs its own radio group so changing one diff cannot deselect another.
     const viewName = `byDIFFview-${++nextViewId}`;
     for (const [value, label] of [
       ["unified", "Unified"],
@@ -549,6 +557,7 @@
     const appendLineText = (cell, text, kind) => {
       const source = text ?? "";
       cell.appendChild(node("span", "byDIFFtext", source.endsWith("\n") ? source.slice(0, -1) : source));
+      // An empty payload represents the final newline; null represents a missing side of a split row.
       if (text === "" && kind !== "equal") cell.appendChild(node("small", "byDIFFnewline", "Newline at end of file"));
       else if (text && !source.endsWith("\n")) cell.appendChild(node("small", "byDIFFnoNewline", "No newline at end of file"));
     };
@@ -628,6 +637,7 @@
   }
 
   byDIFFviewer.diff = (oldSource, newSource, options = {}) => {
+    // The synchronous API consumes the same generator without scheduling browser checkpoints.
     const iterator = compare(oldSource, newSource, options);
     let step;
     do {
