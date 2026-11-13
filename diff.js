@@ -114,7 +114,8 @@
     const document = element.ownerDocument;
     if (document.defaultView.getComputedStyle(document.documentElement).getPropertyValue("--by-diff-themes-loaded").trim() === "1") return;
     warnedPalettes.add(palette);
-    console.warn(`easy-diff-viewer: Palette "${palette}" requires diff.themes.css. Import it after diff.css. https://byuwur.github.io/easy-diff-viewer/`);
+    // console.warn(`easy-diff-viewer: Palette "${palette}" requires diff.themes.css. Import it after diff.css. https://byuwur.github.io/easy-diff-viewer/`);
+    console.warn(`easy-diff-viewer: Palette "${palette}" requires diff.themes.css. Import it after diff.css. https://diff.byuwur.co/`);
   };
 
   // Explicit appearance options override markup; omitted values preserve the container's state.
