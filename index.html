@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en" data-bs-theme="dark">
   <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>easy-diff-viewer | Text differences, spot what changed.</title>
     <meta name="description" content="Compare two texts with aligned side-by-side or unified diffs, line numbers, and whitespace options. A free JavaScript diff viewer by BONYUR." />
@@ -1139,7 +1139,7 @@
             "<!doctype html>",
             '<html lang="en">',
             "  <head>",
-            '    <meta charset="utf-8">',
+            '    <meta charset="UTF-8">',
             '    <meta name="viewport" content="width=device-width, initial-scale=1">',
             "    <title>easy-diff-viewer</title>",
             `    <link rel="stylesheet" href="${base}diff${min}.css">`,
@@ -1198,7 +1198,7 @@
 
         document.getElementById("copy-html").addEventListener("click", (event) => copyText(integrationHTML, integrationCode, event.currentTarget));
         document.getElementById("download-html").addEventListener("click", () => {
-          const url = URL.createObjectURL(new Blob([integrationHTML], { type: "text/html;charset=utf-8" }));
+          const url = URL.createObjectURL(new Blob([integrationHTML], { type: "text/html;charset=UTF-8" }));
           const link = document.createElement("a");
           link.href = url;
           link.download = "easy-diff-viewer.html";
